@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Naming convention:
+ All Analog Channels need the prefix "V". Names must be unique
+-->
+<ADConfig>
+  <!--
+  <adc name="GTMonboard" maxCode="4095" referenceVoltage="3.3">
+    <channel addr="0" signal="Vcon_a_ana_in0"/>
+    <channel addr="1" signal="Vcon_a_ana_in1"/>
+    <channel addr="2" signal="Vcon_b_ana_in0"/>
+    <channel addr="3" signal="Vcon_b_ana_in1"/>
+  </adc>
+  -->
+
+  <!-- DAC buffer on sensor head have a gain of 1.5 on 3.3V ADC reference: 1.5*3.3 = 4.95 -->
+
+  <dac name="DAC0" maxCode="4095" referenceVoltage="4.95">
+    <channel addr="0" signal="DAC_sensor_vrefl_adc"/>
+    <channel addr="1" signal="DAC_sensor_vtxl"/>
+    <channel addr="2" signal="DAC_sensor_vtxl_ab"/>
+    <channel addr="3" signal="DAC_sensor_vtxh"/>
+    <channel addr="4" signal="DAC_sensor_vrst"/>
+    <channel addr="5" signal="DAC_sensor_vref_cds"/>
+    <channel addr="6" signal="DAC_sensor_vrefh_adc"/>
+    <channel addr="7" signal="DAC_sensor_vrefl_cds"/>
+  </dac>
+
+  <dac name="DAC1" maxCode="4095" referenceVoltage="4.95">
+    <channel addr="0" signal="DAC_sensor_tpixpdin1"/>
+    <channel addr="1" signal="DAC_sensor_vdisch"/>
+    <channel addr="2" signal="DAC_sensor_spare2"/>
+    <channel addr="3" signal="DAC_sensor_spare1"/>
+    <channel addr="4" signal="DAC_sensor_tpixpdin0"/>
+    <channel addr="5" signal="DAC_sensor_vdd50sel_rd"/>
+    <channel addr="6" signal="DAC_sensor_vrefm_adc"/>
+    <channel addr="7" signal="DAC_sensor_vdd50_rd"/>
+  </dac>
+
+  <dac name="DAC2" maxCode="4095" referenceVoltage="4.95">
+    <channel addr="2" signal="DAC_lag_sensor_spare2"/>
+    <channel addr="3" signal="DAC_lag_sensor_spare1"/>
+  </dac>
+
+</ADConfig>

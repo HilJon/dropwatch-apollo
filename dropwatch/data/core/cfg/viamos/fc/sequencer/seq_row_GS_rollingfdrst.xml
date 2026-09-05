@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<seqConfig xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="seqConfig.xsd">
+  <sequencer type="" instrWidth="5" addrInstrWidth="0" cntWidth="12" outWidth="18">
+    <title> Sequencer Program for ARTTS Digital Controller ASIC </title>
+    <RAM width="35" lines="256"/>
+    <!-- This File has been generated automatically from the sequencer program described in Excel -->
+    <sourceFileName>\\srv-p.csem.local\Data-P\linux\lnx-users-p\pjo\Documents\2019_02_01_FastEyePlus\2019_07\matlab\core\cfg\viamos\fc\sequencer\viamos_seq_row_GS_rollingfdrst.xls</sourceFileName>
+    <code numLines="41">
+        <instr addr="0" tag=""> 00010000000000000000000000000000000 </instr>
+        <instr addr="1" tag=""> 00011000000000100100000110000000000 </instr>
+        <instr addr="2" tag=""> 11100000000000010101000010000000000 </instr>
+        <instr addr="3" tag=""> 00011000000000100100000110000000000 </instr>
+        <instr addr="4" tag=""> 11100000000000100100000010000000000 </instr>
+        <instr addr="5" tag=""> 00010000000000000100000000000000000 </instr>
+        <instr addr="6" tag=""> 00011001111101000000000111100000000 </instr>
+        <instr addr="7" tag=""> 00011000000000001100001000000100111 </instr>
+        <instr addr="8" tag=""> 00011000000000001100000000000000111 </instr>
+        <instr addr="9" tag=""> 00011000000000001100000000000000110 </instr>
+        <instr addr="10" tag=""> 00011000000000001100010000000010110 </instr>
+        <instr addr="11" tag=""> 00100000000001010100010000000100110 </instr>
+        <instr addr="12" tag=""> 00011000000000001100010000000000110 </instr>
+        <instr addr="13" tag=""> 00011000000000001100010000000000110 </instr>
+        <instr addr="14" tag=""> 00101000000000001100010000000010110 </instr>
+        <instr addr="15" tag=""> 00011000000000001100010000000000110 </instr>
+        <instr addr="16" tag=""> 00011000000000001100010000000000110 </instr>
+        <instr addr="17" tag=""> 00011000000000001100010000000000100 </instr>
+        <instr addr="18" tag=""> 00011000000000001100010000000000000 </instr>
+        <instr addr="19" tag=""> 00011000000000001101010001000001000 </instr>
+        <instr addr="20" tag=""> 00011000000000001101010001000001000 </instr>
+        <instr addr="21" tag=""> 00011000000000001101010001000001000 </instr>
+        <instr addr="22" tag=""> 00011000000000111101010001011001000 </instr>
+        <instr addr="23" tag=""> 00011000000000001101010001011001000 </instr>
+        <instr addr="24" tag=""> 00011000000001001101010001011001000 </instr>
+        <instr addr="25" tag=""> 00011000000011000101010001011001000 </instr>
+        <instr addr="26" tag=""> 00011000000000001101010001011001000 </instr>
+        <instr addr="27" tag=""> 00011000000000001101010001010001000 </instr>
+        <instr addr="28" tag=""> 00011000000000001101010000010001000 </instr>
+        <instr addr="29" tag=""> 11100000000000111101000010000000000 </instr>
+        <instr addr="30" tag=""> 00011000000000001100001000000100000 </instr>
+        <instr addr="31" tag=""> 00011000000000001100000000000000000 </instr>
+        <instr addr="32" tag=""> 00011000000000001100000000000000000 </instr>
+        <instr addr="33" tag=""> 00011000000000001100000000000010000 </instr>
+        <instr addr="34" tag=""> 00100000000001010100000000000100000 </instr>
+        <instr addr="35" tag=""> 00011000000000001100000000000000000 </instr>
+        <instr addr="36" tag=""> 00011000000000001100000000000000000 </instr>
+        <instr addr="37" tag=""> 00101000000000001100000000000010000 </instr>
+        <instr addr="38" tag=""> 00011000000000100100000000000000000 </instr>
+        <instr addr="39" tag=""> 00011000000000001100000001000000000 </instr>
+        <instr addr="40" tag=""> 00001000000000000000000000000000000 </instr>
+    </code>
+  </sequencer>
+</seqConfig>

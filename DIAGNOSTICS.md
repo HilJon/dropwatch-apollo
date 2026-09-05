@@ -1,0 +1,105 @@
+# Investigating zero-byte camera reads
+
+`dwa diagnose` isolates the camera transport from triggering, recording, video
+export and evaluation. It never retries a read or restarts acquisition after a
+fault. It changes the usual acquisition settings, not the camera firmware.
+
+## Run on the Windows acquisition PC
+
+Install the updated package (version 0.2.1 or later); the older wheel does not
+contain this command. From this source folder: `python -m pip install .`.
+Close other programs holding the camera, including another Dropwatch process.
+Use the normal illumination, threshold and exposure. Keep the plate in view.
+
+Start with transport only, separately at each production frame rate:
+
+```powershell
+dwa diagnose --mode transport --fps 1000 --duration 600 --label "stationary plate; normal cable/port"
+dwa diagnose --mode transport --fps 2000 --duration 600 --label "stationary plate; normal cable/port"
+```
+
+Then add the same RLE decoder and integrity checks used by the recorder:
+
+```powershell
+dwa diagnose --mode decode --fps 1000 --duration 600
+dwa diagnose --mode decode --fps 2000 --duration 600
+```
+
+Each command runs for up to ten minutes of acquisition, stopping at the first
+fault. Repeat with representative droplets. These commands do **not** operate
+the dispenser or save droplet videos. Rare faults need longer tests, e.g.
+`--duration 3600`. Repeat separate commands to exercise camera open/start/close.
+
+The acquisition duration excludes setup and cleanup; an in-progress read can
+extend it. `Ctrl+C` requests interruption and report writing after the current
+native call returns. A vendor DLL that hangs or ignores its timeout cannot be
+force-stopped safely by this tool. A forced process kill can leave an empty
+report file; that is not a passed test. There are no background worker threads.
+
+## Reports
+
+Each run creates a unique JSON file in `apollo_diagnostics` (change with
+`--output`). Send the reports from successful runs too, together with the actual
+camera firmware, driver version and USB/cable arrangement. `--label` records
+these notes. Bundle hashes identify the host DLL/config files, **not** the
+firmware actually loaded on the camera.
+
+The report includes:
+
+- Settings, host/Python/package information and DLL/config SHA-256 hashes.
+- Cumulative read counts, byte counts, zero/short reads and empty status polls.
+- The last 500 read/error events, including the failing one; use
+  `--history-size` to change this bound (1..10000). No image arrays are retained.
+- Requested/returned bytes, read duration and delay since the previous read.
+  `read_ms` times `read_image()`, including buffer clearing and vendor error
+  retrieval, not just USB bus time. `decode_ms` includes integrity validation.
+- Numeric encoder status and stored-image count before reads. A best-effort
+  status snapshot is taken after a failure, before cleanup. The original vendor
+  error is captured **before** these additional queries can overwrite it.
+- In decode mode: validated frame count and last 15-bit frame counter per batch.
+- Original failure, cleanup errors and whether camera close succeeded.
+
+Only an empty output file is reserved before opening the camera. The bounded
+history stays in RAM; JSON is written and flushed after cleanup. Existing reports
+are never overwritten. The transport buffer is reused; decode mode adds one
+reused destination (~109 MiB at 100 frames). Both are released on return. If the
+vendor refuses to close its handle, the report explicitly says so; one additional
+close attempt is made during cleanup, without restarting or rereading.
+
+Exit codes: **0** = the selected test passed for this run; **1** = hardware,
+stream or cleanup failure; **130** = interrupted; **2** = invalid arguments.
+Output permission errors fail before opening hardware. Report-write failures
+after acquisition are surfaced as errors, not reported as successful tests.
+
+Transport-only success does **not** establish frame continuity. Decode mode
+checks continuity within and between received batches, including counter wrap,
+but cannot prove images were never lost before the first received frame. This
+test discards images and stops at its deadline without draining the final batch;
+it is not a substitute for recorder/stop qualification in `HARDWARE_ACCEPTANCE.md`.
+
+## Controlled follow-up tests
+
+Change only one factor per comparison. For example, repeat a failing run with
+the same frame rate and a different timeout:
+
+```powershell
+dwa diagnose --mode transport --fps 2000 --duration 600 --read-timeout-ms 2000 --label "timeout comparison"
+```
+
+Defaults match Apollo: 100 frames per RLE flush, 500 ms read timeout at 1–2 kfps,
+threshold 127 and exposure 0.05 ms. Options `--threshold`, `--exposure-time-ms`
+and `--rle-batch-frames` allow matching the production setup. Unsafe batch sizes
+are rejected before opening hardware. `--idle-timeout` defaults to 5 seconds
+without a successful transfer; a run receiving no data never passes.
+
+`--extended-status` adds `numImgAvail` before each read and all three status
+values after each read. These extra vendor calls change timing, so use this as a
+separate comparison, not the initial baseline. Neither `numImgStored > 0` nor
+`numImgAvail` is proven to mean a complete RLE transfer is ready; the baseline
+deliberately uses Apollo's existing readiness rule rather than guessing a new one.
+
+An error near the read timeout suggests investigating readiness/flush timing or
+missing data. A long gap before the failing read suggests checking host delays
+and backlog. Neither observation by itself proves an FPGA, USB or driver fault.
+After isolated transport/decode runs, compare with normal recording and then
+the production evaluator. Full recorder diagnostics remain available via `stats`.

@@ -1,0 +1,130 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+
+<!--
+  This is the parameter description for the simple ramp generator device.
+-->
+
+<device name="ramp" help="the virtual ramp generator device">
+
+  <!-- First, we define some device configurations: -->
+
+  <configuration name="default"   help="the 16-bit Ramp Generator">
+    <parameter name="access"      value="word"   access="r" help="the binary data type access name"/>
+  </configuration>
+  <configuration name="uint8"     help="the 8-bit Ramp Generator">
+    <parameter name="access"      value="byte"   access="r" help="the binary data type access name"/>
+  </configuration>
+  <configuration name="int8"      help="the 8-bit Ramp Generator">
+    <parameter name="access"      value="byte"   access="r" help="the binary data type access name"/>
+  </configuration>
+
+  <configuration name="uint16"    help="the 16-bit Ramp Generator">
+    <parameter name="access"      value="word"   access="r" help="the binary data type access name"/>
+  </configuration>
+  <configuration name="int16"     help="the 16-bit Ramp Generator">
+    <parameter name="access"      value="word"   access="r" help="the binary data type access name"/>
+  </configuration>
+
+  <configuration name="uint32"    help="the 16-bit Ramp Generator">
+    <parameter name="access"      value="quad"   access="r" help="the binary data type access name"/>
+  </configuration>
+  <configuration name="int32"     help="the 16-bit Ramp Generator">
+    <parameter name="access"      value="quad"   access="r" help="the binary data type access name"/>
+  </configuration>
+
+  <configuration name="single"    help="the single precision floating point Ramp Generator">
+    <parameter name="access"      value="float"  access="r" help="the binary data type access name"/>
+    <parameter name="increment"   value="0.1"    access="r" help="the ramp increment (instead default 1)"/>
+  </configuration>
+  <configuration name="double"    help="the double precision floating point Ramp Generator">
+    <parameter name="access"      value="double" access="r" help="the binary data type access name"/>
+    <parameter name="increment"   value="0.1"    access="r" help="the ramp increment (instead default 1)"/>
+  </configuration>
+
+
+  <!-- Second, we define different parameter groups with parameters.
+       These are common for all configurations -->
+
+  <constant name="builtin">
+    <parameter name="name"        value="Ramp Generator"   help="the device name"/>
+    <parameter name="width"       value="160"   help="the (default) image width in pixels"/>
+    <parameter name="height"      value="120"   help="the (default) image height in pixels"/>
+    <parameter name="components"  value="1"     help="the (fix) number of values per pixel"/>
+    <parameter name="numImg"      value="1"     help="the (default) number of images"/>
+  </constant>
+
+  <constant name="initialized"> <!-- at open() -->
+    <parameter name="depth"       value="0"     help="the number of bits per pixel"/>
+    <parameter name="bits"        value="0"     help="the number of bits per value"/>
+    <parameter name="reqBufSize"  value="0"     help="the required buffer size in bytes for the image(s)"/>
+  </constant>
+
+
+  <variable>
+    <!-- dummy variable -->
+    <parameter name="testMode"    value="100"     help="an internal variable, only for test"/>
+  </variable>
+
+
+  <internal>
+    <!-- no internal parameters -->
+  </internal>
+
+
+  <property>
+    <!-- example of a write-only command property definition -->
+    <parameter name="luaCmd" access="w" help="executed as command"/>
+
+    <!-- example of a read-only display property definition -->
+    <parameter name="tempVal" access="r" help="the sensor temperature in °C"/>
+  </property>
+
+
+  <property name="dummy">
+    <!-- properties example with generic handler from group name with index definitions from value -->
+    <parameter name="dummyAlpha" value="1" help="the dummy test A"/>
+    <parameter name="dummyBeta"  value="2" help="the dummy test B"/>
+    <parameter name="dummyGamma" value="3" help="the dummy test C"/>
+  </property>
+
+
+  <register name="GTM" number="32" width="8">
+    <!-- testbench register map example -->
+
+    <parameter name="LinLog"           address="1" access="rw" help="the LinLog settings">
+      <field name="Mode"               mask="0x30" help="the LinLog compression: 0=linear / 1=low / 2=medium / 3=high"/>
+    </parameter>
+
+    <parameter name="COM_MODE"         address="0" access="rw" help="the com mode">
+      <field name="data_sel"           mask="0x03" help="the USB Data select: 00= send memory data / 01= send register values / 10= send test data / 11= send ID string"/>
+    </parameter>
+
+    <parameter name="COM_STATUS"       address="1" access="r" help="the com status">
+      <field name="mem_wr_ready"       mask="0x04" help="Memory write ready"/>
+      <field name="mem_mode"           mask="0x02" help="Memory Mode: 0=single Word / 1=double Word"/>
+      <field name="mem_phy_init_done"  mask="0x01" help="1=> Memory is initialized on physical level" />
+    </parameter>
+  </register>
+
+
+  <register name="sensor" number="54" width="16">
+    <!-- sensor register map example -->
+
+    <parameter name="SENS_REG_GCTRL"      address="0"       access="rw"  help="the Global control register">
+      <field name="SQD"    mask="0x0080" help="Sequencer debug"/>
+      <field name="ECPE"   mask="0x0040" help="Exposure controller RAM prog. enable "/>
+      <field name="AFS"    mask="0x0020" help="Advance frame_sync by 1-CLK"/>
+      <field name="MSE"    mask="0x0010" help="(SC) Main sequencer enable "/>
+      <field name="RSE"    mask="0x0008" help="(SC) Row sequencer enable"/>
+      <field name="ASE"    mask="0x0004" help="(SC) ADC sequencer enable"/>
+      <field name="ROIE"   mask="0x0002" help="ROI enable (all 4 outputs)"/>
+      <field name="ECE"    mask="0x0001" help="Exposure controller enable"/>
+    </parameter>
+
+    <parameter name="sensorId"   address="1" access="r" help="the sensor ID"/>
+    <parameter name="sensorMode" address="5" help="the sensor mode register"/>
+    <parameter name="exposureTime" address="6" help="the exposure time in milliseconds"/>
+
+    </register>
+
+</device>

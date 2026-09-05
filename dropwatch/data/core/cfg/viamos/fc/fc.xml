@@ -1,0 +1,403 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+
+<device name="enclustra" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="device_cfg.xsd">
+
+  <!--------------------------------- CONFIGURATIONS --------------------------------->
+
+  <!-- FastEye / DropWatch -->
+  <configuration name="videoburst_roi_GS_1120_1024" help="FastEye video burst with ROI configuration (GS)">
+    <parameter name="width"           value="1120"  access="r" help="the sensor width,  number of columns"/>
+    <parameter name="height"          value="1024"  access="r" help="the sensor height, number of rows"/>
+    <parameter name="register_init"   value="viamos/fc/register_init_roi_1120_1024.xml"/>
+  </configuration>
+
+  <configuration name="videoburst_roi_GS_1120_512" help="FastEye video burst with ROI configuration (GS)">
+    <parameter name="width"           value="1120" access="r" help="the sensor width,  number of columns"/>
+    <parameter name="height"          value="512"  access="r" help="the sensor height, number of rows"/>
+    <parameter name="register_init"   value="viamos/fc/register_init_roi_1120_512.xml"/>
+  </configuration>
+
+  <configuration name="videoburst_roi_GS_1120_256" help="FastEye video burst with ROI configuration (GS)">
+    <parameter name="width"           value="1120" access="r" help="the sensor width,  number of columns"/>
+    <parameter name="height"          value="256"  access="r" help="the sensor height, number of rows"/>
+    <parameter name="register_init"   value="viamos/fc/register_init_roi_1120_256.xml"/>
+  </configuration>
+
+  <!-- FastEye / DropWatchLight -->
+  <configuration name="rle" help="FastEye video stream with ROI configuration (GS) for run-length-encoder">
+    <parameter name="width"           value="960"   access="r" help="the sensor width,  number of columns"/>
+    <parameter name="height"          value="1024"  access="r" help="the sensor height, number of rows"/>
+    <parameter name="register_init"   value="viamos/fc/register_init_roi_960_1024.xml"/>
+  </configuration>
+
+  <configuration name="videostream_roi_GS_960_1024" help="FastEye video stream with ROI configuration (GS)">
+    <parameter name="width"           value="960"   access="r" help="the sensor width,  number of columns"/>
+    <parameter name="height"          value="1024"  access="r" help="the sensor height, number of rows"/>
+    <parameter name="register_init"   value="viamos/fc/register_init_roi_960_1024.xml"/>
+  </configuration>
+
+  <configuration name="videostream_roi_GS_256_256" help="FastEye video stream with ROI configuration (GS)">
+    <parameter name="width"           value="256" access="r" help="the sensor width,  number of columns"/>
+    <parameter name="height"          value="256"  access="r" help="the sensor height, number of rows"/>
+    <parameter name="register_init"   value="viamos/fc/register_init_roi_256_256.xml"/>
+  </configuration>
+
+  <configuration name="videostream_roi_GS_32_32" help="FastEye video stream with ROI configuration (GS)">
+    <parameter name="width"           value="32" access="r" help="the sensor width,  number of columns"/>
+    <parameter name="height"          value="32"  access="r" help="the sensor height, number of rows"/>
+    <parameter name="register_init"   value="viamos/fc/register_init_roi_32_32.xml"/>
+  </configuration>
+
+  <!--------------------------------- COMMON CONSTANTS & VARIABLES --------------------------------->
+
+  <constant name="builtin">
+    <parameter name="depth"           value="10"    help="the number of bits per pixel"/>
+    <parameter name="ad_config"       value="viamos/fc/ad_config.xml"/>
+    <parameter name="sequencer_exp"   value="viamos/fc/sequencer/seq_exp_GS_rollingfdrst.xml"/>
+    <parameter name="sequencer_row"   value="viamos/fc/sequencer/seq_row_GS_rollingfdrst.xml"/>
+    <parameter name="sequencer_col"   value="viamos/fc/sequencer/seq_col_GS.xml"/>
+  </constant>
+
+  <constant name="initialized">       <!-- initialized at run-time -->
+    <parameter name="name"            value="???"   help="the USB device name"/>
+    <parameter name="serialNr"        value="???"   help="the serial number of the camera"/>
+    <parameter name="reqBufSize"      value="???"   help="the required buffer size in bytes per frame"/>
+  </constant>
+
+  <variable>
+    <parameter name="TagName"         value="0"     help="sets the tag name"/>
+  </variable>
+
+  <!------------------------------------------- PROPERTIES (NEED SET/GET HANDLERS) --------------------------------->
+
+  <property name= "general">
+    <parameter name="numImg"                    access="rw"  help="the number of images returned per trigger"/>
+    <parameter name="timeOut"                   access="rw"  help="the USB time-out in miliseconds"/>
+    <parameter name="idString"                  access="r"   help="reads the id string from the device"/>
+    <parameter name="numPackets"                access="r"   help="the number of 19x10bit packets to read and unpack"/>
+    <parameter name="numImgStored"              access="r"   help="the number of images stored (from FPGA)"/>
+    <parameter name="numImgAvail"               access="rw"  help="the number of images available"/>
+    <parameter name="binarizationThreshold"     access="w"   help="the inverted binarization threshold (byte) used in encoder"/>
+    <parameter name="maxBytesPerImage"          access="w"   help="the maximum number of bytes per image for encoder"/>
+    <parameter name="numImgFlush"               access="w"   help="the number of images to flush encoder"/>
+    <parameter name="encoderStatus"             access="r"   help="the encoder status"/>
+    <parameter name="exposureTime"              access="w"   help="the exposure time in ms"/>
+    <parameter name="framePeriod"               access="w"   help="the frame period in ms"/>
+    <parameter name="trigDelay"                 access="w"   help="the trigger delay in ms"/>
+    <parameter name="sync"                      access="w"   help="send a sync command ('read', 'frame' or 'flush')"/>
+    <parameter name="test"                      access="r"   help="run a test"/>
+    <parameter name="seqRamData"                access="r"   help="read the sequencer ram (see seqRamBase, seqRamAddr)"/>
+    <parameter name="seqRamBase"                access="w"   help="set the sequencer ram base (1..3)"/>
+    <parameter name="seqRamAddr"                access="w"   help="set the sequencer ram address (0..511)"/>
+  </property>
+
+  <property name="ReferenceVoltagesDAC0">
+    <parameter name="DAC_sensor_vrefl_adc"      access="w" help="sets the DAC0 Channel=0 value"/>
+    <parameter name="DAC_sensor_vtxl"           access="w" help="sets the DAC0 Channel=1 value"/>
+    <parameter name="DAC_sensor_vtxl_ab"        access="w" help="sets the DAC0 Channel=2 value"/>
+    <parameter name="DAC_sensor_vtxh"           access="w" help="sets the DAC0 Channel=3 value"/>
+    <parameter name="DAC_sensor_vrst"           access="w" help="sets the DAC0 Channel=4 value"/>
+    <parameter name="DAC_sensor_vref_cds"       access="w" help="sets the DAC0 Channel=5 value"/>
+    <parameter name="DAC_sensor_vrefh_adc"      access="w" help="sets the DAC0 Channel=6 value"/>
+    <parameter name="DAC_sensor_vrefl_cds"      access="w" help="sets the DAC0 Channel=7 value"/>
+  </property>
+
+  <property name="ReferenceVoltagesDAC1">
+    <parameter name="DAC_sensor_tpixpdin1"      access="w" help="sets the DAC1 Channel=0 value"/>
+    <parameter name="DAC_sensor_vdisch"         access="w" help="sets the DAC1 Channel=1 value"/>
+    <parameter name="DAC_sensor_spare2"         access="w" help="sets the DAC1 Channel=2 value"/>
+    <parameter name="DAC_sensor_spare1"         access="w" help="sets the DAC1 Channel=3 value"/>
+    <parameter name="DAC_sensor_tpixpdin0"      access="w" help="sets the DAC1 Channel=4 value"/>
+    <parameter name="DAC_sensor_vdd50sel_rd"    access="w" help="sets the DAC1 Channel=5 value"/>
+    <parameter name="DAC_sensor_vrefm_adc"      access="w" help="sets the DAC1 Channel=6 value"/>
+    <parameter name="DAC_sensor_vdd50_rd"       access="w" help="sets the DAC1 Channel=7 value"/>
+  </property>
+
+  <property name="ReferenceVoltagesDAC2">
+    <parameter name="DAC_lag_sensor_spare2"     access="w" help="sets the DAC2 (Channel=2 value"/>
+    <parameter name="DAC_lag_sensor_spare1"     access="w" help="sets the DAC2 Channel=3 value"/>
+  </property>
+
+  <property name="GTMDACChannels">
+    <parameter name="GTMDAC0"                   access="w" help="sets the GTMDAC Channel=0 value"/>
+    <parameter name="GTMDAC1"                   access="w" help="sets the GTMDAC Channel=1 value"/>
+    <parameter name="GTMDAC2"                   access="w" help="sets the GTMDAC Channel=2 value"/>
+    <parameter name="GTMDAC3"                   access="w" help="sets the GTMDAC Channel=3 value"/>
+    <parameter name="GTMDAC4"                   access="w" help="sets the GTMDAC Channel=4 value"/>
+    <parameter name="GTMDAC5"                   access="w" help="sets the GTMDAC Channel=5 value"/>
+    <parameter name="GTMDAC6"                   access="w" help="sets the GTMDAC Channel=6 value"/>
+    <parameter name="GTMDAC7"                   access="w" help="sets the GTMDAC Channel=7 value"/>
+  </property>
+
+  <property name="GTMADCChannels">
+    <parameter name="GTMADC0"                   access="r" help="get the GTMADC Channel=0 value"/>
+    <parameter name="GTMADC1"                   access="r" help="get the GTMADC Channel=1 value"/>
+    <parameter name="GTMADC2"                   access="r" help="get the GTMADC Channel=2 value"/>
+    <parameter name="GTMADC3"                   access="r" help="get the GTMADC Channel=3 value"/>
+  </property>
+
+  <!------------------------------------- SENSOR REGISTERS --------------------------------->
+
+
+  <register name="sensor"                 number="1024" width="16">
+
+    <parameter name="sens_MEM_EXP_ADR"     address="259" access="rw" help="debug"/>
+    <parameter name="sens_MEM_EXP_D2"      address="258" access="rw" help="debug"/>
+    <parameter name="sens_MEM_EXP_D1"      address="257" access="rw" help="debug"/>
+    <parameter name="sens_MEM_EXP_D0"      address="256" access="rw" help="debug"/>
+
+    <parameter name="sens_MEM_COL_ADR"     address="515" access="rw" help="debug"/>
+    <parameter name="sens_MEM_COL_D2"      address="514" access="rw" help="debug"/>
+    <parameter name="sens_MEM_COL_D1"      address="513" access="rw" help="debug"/>
+    <parameter name="sens_MEM_COL_D0"      address="512" access="rw" help="debug"/>
+
+    <parameter name="sens_MEM_ROW_ADR"     address="771" access="rw" help="debug"/>
+    <parameter name="sens_MEM_ROW_D2"      address="770" access="rw" help="debug"/>
+    <parameter name="sens_MEM_ROW_D1"      address="769" access="rw" help="debug"/>
+    <parameter name="sens_MEM_ROW_D0"      address="768" access="rw" help="debug"/>
+
+    <parameter name="sens_ADCDIS_2"       address="32"  access="rw" help="ADC enable"/>
+    <parameter name="sens_ADCDIS_1"       address="31"  access="rw" help="ADC enable"/>
+    <parameter name="sens_ADCDIS_0"       address="30"  access="rw" help="ADC enable"/>
+    <parameter name="sens_ADCCTR"         address="29"  access="rw" help="debug feature">
+      <field name="ctr_2"                 mask="0x0004"             help="hallo"/>
+      <field name="ctr_1"                 mask="0x0002"             help="hallo"/>
+      <field name="ctr_0"                 mask="0x0001"             help="hallo"/>
+    </parameter>
+    <parameter name="sens_TCTRL"          address="28"  access="rw" help="debug feature"/>
+    <parameter name="sens_TBUS"           address="27"  access="rw" help="debug feature"/>
+    <parameter name="sens_SEQ3_INP"       address="26"  access="rw" help="debug feature"/>
+    <parameter name="sens_SEQ2_INP"       address="25"  access="rw" help="debug feature">
+      <field name="INP_dfr"               mask="0x0001"  help="enable dark frame acquisition"/>
+    </parameter>
+    <parameter name="sens_SEQ1_INP"       address="24"  access="rw" help="debug feature">
+     <field name="INP_rst_PD"             mask="0x0004"             help="enable dark frame acquisition by keeping PD in reset"/>
+    </parameter>
+    <parameter name="sens_SEQ3_IR4"       address="23"  access="rw" help="debug feature"/>
+    <parameter name="sens_SEQ3_IR3"       address="22"  access="rw" help="debug feature"/>
+    <parameter name="sens_SEQ3_IR2"       address="21"  access="rw" help="debug feature"/>
+    <parameter name="sens_SEQ3_IR1"       address="20"  access="rw" help="debug feature"/>
+    <parameter name="sens_SEQ2_IR4"       address="19"  access="rw" help="debug feature"/>
+    <parameter name="sens_SEQ2_IR3"       address="18"  access="rw" help="debug feature"/>
+    <parameter name="sens_SEQ2_IR2"       address="17"  access="rw" help="debug feature"/>
+    <parameter name="sens_SEQ2_IR1"       address="16"  access="rw" help="debug feature"/>
+    <parameter name="sens_SEQ1_IR4"       address="15"  access="rw" help="debug feature"/>
+    <parameter name="sens_SEQ1_IR3"       address="14"  access="rw" help="debug feature"/>
+    <parameter name="sens_SEQ1_IR2"       address="13"  access="rw" help="debug feature"/>
+    <parameter name="sens_SEQ1_IR1"       address="12"  access="rw" help="debug feature"/>
+    <parameter name="sens_ABTRIM"         address="11"  access="rw" help="Analog Trimm Register"/>
+    <parameter name="sens_ABIAS"          address="10"  access="rw" help="Analog Bias Register">
+      <field name="adce"                  mask="0x8000"             help=""/>
+      <field name="cdse"                  mask="0x4000"             help=""/>
+      <field name="cse"                   mask="0x2000"             help=""/>
+      <field name="ape"                   mask="0x1000"             help=""/>
+      <field name="ibref_2"               mask="0x0800"             help=""/>
+      <field name="ibref_1"               mask="0x0400"             help=""/>
+      <field name="ibref_0"               mask="0x0200"             help=""/>
+      <field name="ibcol_2"               mask="0x0100"             help=""/>
+      <field name="ibcol_1"               mask="0x0080"             help=""/>
+      <field name="ibcol_0"               mask="0x0040"             help=""/>
+      <field name="ibdds_2"               mask="0x0020"             help=""/>
+      <field name="ibdds_1"               mask="0x0010"             help=""/>
+      <field name="ibdds_0"               mask="0x0008"             help=""/>
+      <field name="ibadc_2"               mask="0x0004"             help=""/>
+      <field name="ibadc_1"               mask="0x0002"             help=""/>
+      <field name="ibadc_0"               mask="0x0001"             help=""/>
+    </parameter>
+    <parameter name="sens_TEXP"           address=" 9"  access="rw" help="Exposure Time [in units of sens_ETU]"/>
+    <parameter name="sens_ETU"            address=" 8"  access="rw" help="Exposure Time Units"/>
+    <parameter name="sens_RROIET_2"       address=" 7"  access="rw" help="row region-of-interest enable bit 65..64"/>
+    <parameter name="sens_RROIET_1"       address=" 6"  access="rw" help="row region-of-interest enable bit 65..64"/>
+    <parameter name="sens_RROIET_0"       address=" 5"  access="rw" help="row region-of-interest enable bit 63..48"/>
+    <parameter name="sens_RROIEB_2"       address=" 4"  access="rw" help="row region-of-interest enable bit 47..32"/>
+    <parameter name="sens_RROIEB_1"       address=" 3"  access="rw" help="row region-of-interest enable bit 31..16"/>
+    <parameter name="sens_RROIEB_0"       address=" 2"  access="rw" help="row region-of-interest enable bit 15..0"/>
+    <parameter name="sens_GCTRL_1"        address=" 1"  access="rw" help="Global Control Register">
+      <field name="sel_gpo_5"             mask="0x8000"             help=""/>
+      <field name="sel_gpo_4"             mask="0x4000"             help=""/>
+      <field name="sel_gpo_3"             mask="0x2000"             help=""/>
+      <field name="sel_gpo_2"             mask="0x1000"             help=""/>
+      <field name="sel_gpo_1"             mask="0x0800"             help=""/>
+      <field name="sel_gpo_0"             mask="0x0400"             help=""/>
+      <field name="sel_muxadr"            mask="0x0200"             help=""/>
+      <field name="sel_10_sncpat"         mask="0x0100"             help=""/>
+      <field name="en_err"                mask="0x0080"             help=""/>
+      <field name="sel_err_1"             mask="0x0040"             help=""/>
+      <field name="sel_err_0"             mask="0x0020"             help=""/>
+      <field name="sel_adc_rng"           mask="0x0010"             help=""/>
+      <field name="sel_etu_trig"          mask="0x0008"             help=""/>
+      <field name="unused_02"             mask="0x0004"             help=""/>
+      <field name="oe_drive_1"            mask="0x0002"             help=""/>
+      <field name="oe_drive_0"            mask="0x0001"             help=""/>
+    </parameter>
+    <parameter name="sens_GCTRL"          address=" 0"  access="rw" help="Global Control Register">
+      <field name="seq_col_en"            mask="0x8000"             help=""/>
+      <field name="seq_col_pe"            mask="0x4000"             help=""/>
+      <field name="seq_row_en"            mask="0x2000"             help=""/>
+      <field name="seq_row_pe"            mask="0x1000"             help=""/>
+      <field name="seq_exp_en"            mask="0x0800"             help=""/>
+      <field name="seq_exp_pe"            mask="0x0400"             help=""/>
+      <field name="mode_11bit"            mask="0x0200"             help=""/>
+      <field name="sel_glb_shut"          mask="0x0100"             help=""/>
+      <field name="unused_07"             mask="0x0080"             help=""/>
+      <field name="subs_col"              mask="0x0040"             help=""/>
+      <field name="subs_row"              mask="0x0020"             help=""/>
+      <field name="pbf_LH"                mask="0x0010"             help=""/>
+      <field name="pbf_UH"                mask="0x0008"             help=""/>
+      <field name="unused_02"             mask="0x0004"             help=""/>
+      <field name="cdsg_1"                mask="0x0002"             help=""/>
+      <field name="cdsg_0"                mask="0x0001"             help=""/>
+    </parameter>
+  </register>
+
+
+  <!------------------------------------- FPGA FW REGISTERS --------------------------------->
+
+<register name="GTM" number="120" width="8">
+
+    <parameter name="COM_MODE"              address="0"             access="rw" help="communication mode">
+      <field name="data_sel"                mask="0x03"                         help="USB Data select: 00=send memory data / 10=send test data / 11=send ID string"/>
+    </parameter>
+
+    <parameter name="COM_STATUS"            address="1"             access="r"  help="communication status">
+      <field name="mem_wr_mode"             mask="0x04"                         help="Memory Mode: 0=single Word / 1=double Word"/>
+      <field name="mem_wr_ready"            mask="0x02"                         help="Memory write ready"/>
+      <field name="mem_phy_init_done"       mask="0x01"                         help="Memory Phy Initialisation done"/>
+    </parameter>
+
+    <parameter name="COM_DBG"               address="2"             access="rw" help="communication debug"/>
+
+    <parameter name="COM_CMD"               address="3"             access="rw" help="communication command (see CONST_COM_CMD)"/>
+
+    <!-- application specific -->
+    <!-- Addresses can be found in register_map_pkg.vhd, Widths can be found in register_map_app_pkg.vhd -->
+
+    <parameter name="APP_MODE"              address="4"             access="rw" help="application mode (bit 0:clear_flags, 1:cl_enable, 2:ext_trg, 3:dbg_img, 4:mem_mode 5:en_mult_trg)">
+      <field name="clear_flags"             mask="0x01"                         help=""/>
+      <field name="cl_enable"               mask="0x02"                         help=""/>
+      <field name="en_ext_trg"              mask="0x04"                         help="Enable external trigger"/>
+      <field name="en_dbg_img"              mask="0x08"                         help="enable debug image from testdata generator"/>
+      <field name="mem_mode"                mask="0x10"                         help=""/>
+      <field name="en_mult_trg"             mask="0x20"                         help="Multi trigger enable (external trigger). Program also APP_EXTRG_TIMEOUT"/>
+	  <field name="en_self_trig"     	   	   mask="0x40"             			help="Self-trigger enable (by on-board analysis block)"/>
+    </parameter>
+
+    <parameter name="APP_STATUS"            address="5"             access="r"  help="application status (bit 0:sens_err)"/>
+    <parameter name="APP_DBG"               address="6"             access="rw" help="application debug register (bit 2:sens_spi.gen_extra_clocks)"/>
+    <parameter name="APP_CMD"               address="7"             access="rw" help="application command (see CONST_APP_CMD)"/>
+
+    <parameter name="APP_DATABUS_ADDR"      address="8"  width="16" access="rw" help="databus address"/>
+    <parameter name="APP_DATABUS_RD"        address="10" width="16" access="r"  help="databus read data"/>
+    <parameter name="APP_DATABUS_WR"        address="12" width="16" access="rw" help="databus write data"/>
+
+    <parameter name="SENS_MODE"             address= "14"           access="rw" help="sensor mode (bit 0:sens_reset_n, 1:sens_testmode)"/>
+    <parameter name="SENS_CLOCK"            address= "15"           access="rw" help="sensor clocking (bit 3..0:sens_clk_div)"/>
+
+    <parameter name="APP_NR_IMGS"           address="16" width="16" access="rw" help="number images per frame"/>
+    <parameter name="APP_NR_ROWS"           address="18" width="16" access="rw" help="number of rows"/>
+    <parameter name="APP_NR_16COLS"         address="20"            access="rw" help="number of blocks of 16 columns"/>
+    <parameter name="APP_EXTRG_TIMEOUT"     address="23"            access="rw" help="timeout of external multi trigger unit: 7.5ns*2^16=0.5ms"/>
+
+    <parameter name="APP_FRM_PERIOD"        address="24" width="16" access="rw" help="frame period (0 equal free running)"/>
+    <parameter name="APP_LAG_CTRL_1"        address="26"            access="rw" help="lag controller: dac_sync_ctrl.NR_BRIGHT_FR|NR_DARK_FR)"/>
+    <parameter name="APP_LAG_CTRL_2"        address="27"            access="rw" help="lag controller: dac_sync_ctrl.T_DELAY)"/>
+    <parameter name="APP_LAG_CTRL_3"        address="28"            access="rw" help="lag controller: dac_sync_ctrl.T_ILLUM)"/>
+
+    <parameter name="COM_DBG_ADR"           address="29"            access="w"  help="ddr2 controller debug: address)"/>
+    <parameter name="COM_DBG_DAT"           address="30"            access="r"  help="ddr2 controller debug: read data)"/>
+
+    <parameter name="APP_DBG_1"             address="31" width="8"  access="rw" help="custom debug variable used to select output to JTAG"/>
+
+    <parameter name="APP_CL_NR_ROWS"        address="32" width="16" access="rw" help="camera link output: number of rows"/>
+    <parameter name="APP_CL_NR_COLS"        address="34" width="16" access="rw" help="camera link output: number of columns (of 4 taps)"/>
+    <parameter name="APP_CROIE_0"           address="36" width="16" access="rw" help="column region-of-interest enable bit 15..0"/>
+    <parameter name="APP_CROIE_1"           address="38" width="16" access="rw" help="column region-of-interest enable bit 31..16"/>
+    <parameter name="APP_CROIE_2"           address="40" width="16" access="rw" help="column region-of-interest enable bit 47..32"/>
+    <parameter name="APP_CROIE_3"           address="42" width="16" access="rw" help="column region-of-interest enable bit 63..48"/>
+    <parameter name="APP_CROIE_4"           address="44" width="16" access="rw" help="column region-of-interest enable bit 79..64"/>
+    <parameter name="APP_CROIE_5"           address="46" width="16" access="rw" help="column region-of-interest enable bit 81..80"/>
+
+    <parameter name="DATABUS_ADDR"          address="48" width="8"  access="rw" help="column region-of-interest enable bit 81..80"/>
+    <parameter name="DATABUS_RD_LOW"        address="50" width="8"  access="rw" help="column region-of-interest enable bit 81..80"/>
+
+	<!-- memory read settings -->
+	<parameter name="MEM_NR_IMG_START_0"  	  address="60" width="8"  access="rw" help="memory image number to start reading/writing from (MSB)"/>
+	<parameter name="MEM_NR_IMG_START_1"  	  address="61" width="8"  access="rw" help="memory image number to start reading/writing from "/>
+	<parameter name="MEM_NR_IMG_START_2"  	  address="62" width="8"  access="rw" help="memory image number to start reading/writing from (LSB)"/>
+	<parameter name="MEM_NR_IMG_READ_0"  	  address="63" width="8"  access="rw" help="memory number images to be read (MSB)"/>
+	<parameter name="MEM_NR_IMG_READ_1"  	  address="64" width="8"  access="rw" help="memory number images to be read "/>
+	<parameter name="MEM_NR_IMG_READ_2"  	  address="65" width="8"  access="rw" help="memory number images to be read (LSB)"/>
+
+	<parameter name="MEM_CTRL"  	  			  address="66" width="8"  access="rw" help="memory ctrl signal (bit0: reset memory controller; bit1: set memory start image number (reading); bit2: set memory start image number (writing))"/>
+
+    <!-- accelerator registers -->
+    <parameter name="ACCELERATOR_LAYER0"    address="70" width="8"  access="rw" help="accelerator register: "/>
+    <parameter name="ACCELERATOR_LAYER1"    address="71" width="8"  access="rw" help="accelerator register: "/>
+    <parameter name="ACCELERATOR_LAYER2"    address="72" width="8"  access="rw" help="accelerator register: "/>
+    <parameter name="ACCELERATOR_LAYER3"    address="73" width="8"  access="rw" help="accelerator register: "/>
+    <parameter name="ACCELERATOR_PE0"       address="74" width="8"  access="rw" help="accelerator register: "/>
+    <parameter name="ACCELERATOR_PE1"       address="75" width="8"  access="rw" help="accelerator register: "/>
+    <parameter name="ACCELERATOR_PE2"       address="76" width="8"  access="rw" help="accelerator register: "/>
+    <parameter name="ACCELERATOR_PE3"       address="77" width="8"  access="rw" help="accelerator register: "/>
+    <parameter name="ACCELERATOR_MEMLINE0"  address="78" width="8"  access="rw" help="accelerator register: "/>
+    <parameter name="ACCELERATOR_MEMLINE1"  address="79" width="8"  access="rw" help="accelerator register: "/>
+    <parameter name="ACCELERATOR_MEMLINE2"  address="80" width="8"  access="rw" help="accelerator register: "/>
+    <parameter name="ACCELERATOR_MEMLINE3"  address="81" width="8"  access="rw" help="accelerator register: "/>
+
+    <parameter name="ACCELERATOR_DATA0"     address="82" width="8"  access="rw" help="accelerator register: "/>
+    <parameter name="ACCELERATOR_DATA1"     address="83" width="8"  access="rw" help="accelerator register: "/>
+    <parameter name="ACCELERATOR_DATA2"     address="84" width="8"  access="rw" help="accelerator register: "/>
+    <parameter name="ACCELERATOR_DATA3"     address="85" width="8"  access="rw" help="accelerator register: "/>
+    <parameter name="ACCELERATOR_DATA4"     address="86" width="8"  access="rw" help="accelerator register: "/>
+    <parameter name="ACCELERATOR_DATA5"     address="87" width="8"  access="rw" help="accelerator register: "/>
+    <parameter name="ACCELERATOR_DATA6"     address="88" width="8"  access="rw" help="accelerator register: "/>
+    <parameter name="ACCELERATOR_DATA7"     address="89" width="8"  access="rw" help="accelerator register: "/>
+
+    <parameter name="ACCELERATOR_CTRL"    	  address="90" width="8"  access="rw" help="accelerator register: "/>
+	<parameter name="ACCELERATOR_READY"    	  address="91" width="8"  access="rw" help="accelerator register: "/>
+    <parameter name="ACCELERATOR_RESULT_SEL"  address="92" width="8"  access="rw" help="accelerator register: "/>
+
+	<parameter name="ACCELERATOR_THRESHOLD"   address="93" width="8"  access="rw" help="accelerator register: "/>
+	<parameter name="ACCELERATOR_RESULT_"   address="93" width="8"  access="rw" help="accelerator register: "/>
+
+    <parameter name="ACCELERATOR_RESULT0"     address="100" width="8"  access="rw" help="accelerator register: "/>
+    <parameter name="ACCELERATOR_RESULT1"     address="101" width="8"  access="rw" help="accelerator register: "/>
+	<parameter name="ACCELERATOR_RESULT2"     address="102" width="8"  access="rw" help="accelerator register: "/>
+	<parameter name="ACCELERATOR_RESULT3"     address="103" width="8"  access="rw" help="accelerator register: "/>
+	<parameter name="ACCELERATOR_RESULT4"     address="104" width="8"  access="rw" help="accelerator register: "/>
+	<parameter name="ACCELERATOR_RESULT5"     address="105" width="8"  access="rw" help="accelerator register: "/>
+	<parameter name="ACCELERATOR_RESULT6"     address="106" width="8"  access="rw" help="accelerator register: "/>
+	<parameter name="ACCELERATOR_RESULT7"     address="107" width="8"  access="rw" help="accelerator register: "/>
+
+    <parameter name="MEM_NR_IMG_STORED_0"   address="110" width="8" access="rw" help="memory register stating number of currently stored images (LSB)"/>
+    <parameter name="MEM_NR_IMG_STORED_1"   address="111" width="8" access="rw" help="memory register stating number of currently stored images: "/>
+    <parameter name="MEM_NR_IMG_STORED_2"   address="112" width="8" access="rw" help="memory register stating number of currently stored images: (MSB)"/>
+
+    <parameter name="EXT_TRG_FILTER_0"  	address="113" width="8"  access="rw" help="ext trigger filter: min high time LSB (step = 1.6us; 0-104ms)"/>
+	<parameter name="EXT_TRG_FILTER_1"  	address="114" width="8"  access="rw" help="ext trigger filter: min high time MSB (step = 1.6us; 0-104ms)"/>
+	<parameter name="EXT_TRG_SINGLE"  		address="115" width="8"  access="rw" help="ext trigger single mode (bit0: reset; bit1: enable single mode)"/>
+	<parameter name="EXT_TRG_DELAY_0"  		address="116" width="8"  access="rw" help="ext trigger delay LSB (step = 25.6us; 0-1600ms)"/>
+	<parameter name="EXT_TRG_DELAY_1"  		address="117" width="8"  access="rw" help="ext trigger delay MSB (step = 25.6us; 0-1600ms)"/>
+
+  </register>
+
+  <constant name="CONST_COM_CMD">
+    <parameter name="SYNC"                  value="0x01"                        help="ComCMD to issue a sync command to the usb interface"/>
+    <parameter name="LED_ON"                value="0x40"                        help="ComCMD to enable the LEDs"/>
+    <parameter name="LED_OFF"               value="0x80"                        help="ComCMD to disable the LEDs"/>
+  </constant>
+
+  <constant name="CONST_APP_CMD">
+    <parameter name="WR_DAC0"               value="1"                           help="AppCMD to write DAC0 using databus registers"/>
+    <parameter name="WR_DAC1"               value="2"                           help="AppCMD to write DAC1 using databus registers"/>
+    <parameter name="WR_DAC2"               value="3"                           help="AppCMD to write DAC2 using databus registers"/>
+    <parameter name="WR_DAC3"               value="4"                           help="AppCMD to write DAC3 using databus registers"/>
+    <parameter name="WR_DAC4"               value="5"                           help="AppCMD to write DAC4 using databus registers"/>
+    <parameter name="WR_IIC"                value="30"                          help="AppCMD to write IIC  using databus registers"/>
+    <parameter name="RD_IIC"                value="31"                          help="AppCMD to read  IIC  using databus registers"/>
+    <parameter name="WR_SPI"                value="32"                          help="AppCMD to write SPI  using databus registers"/>
+    <parameter name="RD_SPI"                value="34"                          help="AppCMD to read  SPI  using databus registers"/>
+    <parameter name="FRAME_SYNC"            value="64"                          help="AppCMD to send frame sync command"/>
+  </constant>
+
+</device>

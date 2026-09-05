@@ -1,0 +1,20 @@
+test:
+  tags:
+    - python
+    - powershell
+  script:
+    - py -m venv venv
+    - .\venv\Scripts\python.exe -m pip install --upgrade pip
+    - .\venv\Scripts\python.exe -m pip install --group dev -e .
+    - .\venv\Scripts\python.exe -m pytest --cov=dropwatch --cov-report=term-missing --cov-fail-under=80
+    - .\venv\Scripts\python.exe -m ruff check .
+    - .\venv\Scripts\python.exe -m ruff format --check .
+    - .\venv\Scripts\python.exe -m mypy dropwatch
+    - .\venv\Scripts\python.exe -m build --wheel
+    - |
+      $version = & .\venv\Scripts\python.exe -c "from importlib.metadata import version; print(version('dropwatch-apollo'))"
+      $wheel = Get-Item "dist\dropwatch_apollo-$version-py3-none-win_amd64.whl"
+      if (-not $wheel) { throw "Windows wheel was not built" }
+      py -m venv wheel-test
+      .\wheel-test\Scripts\python.exe -m pip install $wheel.FullName
+      .\wheel-test\Scripts\python.exe -I -c "from importlib.resources import files; import dropwatch; assert dropwatch.__version__ == '$version'; assert hasattr(dropwatch.DropwatchApollo, 'save_raw'); assert files('dropwatch').joinpath('data/core/PLabDAQCore.dll').is_file()"

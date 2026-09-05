@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<seqConfig xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="seqConfig.xsd">
+  <sequencer type="" instrWidth="5" addrInstrWidth="0" cntWidth="12" outWidth="18">
+    <title> Sequencer Program for ARTTS Digital Controller ASIC </title>
+    <RAM width="35" lines="256"/>
+    <!-- This File has been generated automatically from the sequencer program described in Excel -->
+    <sourceFileName>\\srv-p.csem.local\Data-P\linux\lnx-users-p\pjo\Documents\2019_02_01_FastEyePlus\2019_07\matlab\core\cfg\viamos\fc\sequencer\viamos_seq_exp_GS_rollingfdrst.xls</sourceFileName>
+    <code numLines="12">
+        <instr addr="0" tag=""> 00010000000000000000000000000000000 </instr>
+        <instr addr="1" tag="TPDRST start"> 00100000001100100000000001010101000 </instr>
+        <instr addr="2" tag="TPDRST end"> 00101000000000000000000001010101000 </instr>
+        <instr addr="3" tag="EXPOSURE"> 01101000000000011111111110010100000 </instr>
+        <instr addr="4" tag="spacing0"> 00011000000010100111111110010100000 </instr>
+        <instr addr="5" tag="spacing1"> 00011000000000001111111110110100000 </instr>
+        <instr addr="6" tag="spacing2"> 00011010001100100111111110010100000 </instr>
+        <instr addr="7" tag="spacing3"> 00011000000000100111111110010100000 </instr>
+        <instr addr="8" tag="TTX start"> 00100000001010000111111110010100010 </instr>
+        <instr addr="9" tag="TTX end"> 00101000000000000111111110010100010 </instr>
+        <instr addr="10" tag=""> 00011000000000001000000000010100000 </instr>
+        <instr addr="11" tag="backjump"> 00001000000000000000000000100000000 </instr>
+    </code>
+  </sequencer>
+</seqConfig>

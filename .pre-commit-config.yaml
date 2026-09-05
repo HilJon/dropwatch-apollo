@@ -1,0 +1,17 @@
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.15.7
+    hooks:
+      - id: ruff-check
+        args: [--fix]
+      - id: ruff-format
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.19.1
+    hooks:
+      - id: mypy
+        args: [dropwatch]
+        pass_filenames: false
+        additional_dependencies:
+          - numpy>=1.24.0
+          - opencv-python>=4.10.0.84
+          - typing-extensions>=4.12.2

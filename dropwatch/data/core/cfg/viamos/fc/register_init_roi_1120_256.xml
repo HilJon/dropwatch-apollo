@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<paramConfig>
+
+  <sequence name="initial">
+
+    <!-- Sensor clock divider: log! => 0=>1/1; 1=> 1/2; 2=>1/4 -->
+    <set parameter="SENS_CLOCK"        value="2"/>
+
+    <!-- apply and release the reset -->
+    <set parameter="SENS_MODE"         value="0"/>
+    <set parameter="SENS_MODE"         value="4"/> <!-- apply app sens pipeline reset -->
+    <set parameter="SENS_MODE"         value="0"/>
+    <set parameter="SENS_MODE"         value="1"/> <!-- release sens reset -->
+
+    <!-- reset the calibration -->
+    <set parameter="COM_DBG_ADR"       value="255"/>
+    <set parameter="COM_DBG_ADR"       value="0"/>
+
+    <!-- Sensor register init -->
+    <set parameter="sens_GCTRL_1"      value="0"/>
+    <set parameter="sens_GCTRL_1"      value="2"/>
+    <set parameter="sens_GCTRL_1"      value="0"/>
+    <set parameter="sens_GCTRL_1"      value="2"/>
+    <set parameter="sens_GCTRL_1"      value="0x00E3"/>
+    <set parameter="sens_GCTRL"        value="0xA903"/>
+
+    <!-- enable 256 rows: 8 row blocks top / 8 row blocks bot -->
+    <set parameter="sens_RROIET_0"     value="0x0000"/>
+    <set parameter="sens_RROIET_1"     value="0xFE00"/>
+    <set parameter="sens_RROIET_2"     value="0x0001"/>
+
+    <set parameter="sens_RROIEB_0"     value="0x0000"/>
+    <set parameter="sens_RROIEB_1"     value="0xFE00"/>
+    <set parameter="sens_RROIEB_2"     value="0x0001"/>
+
+    <!-- enable 1120 columns: 70 column blocks -->
+    <set parameter="APP_CROIE_0"       value="0xFFFF"/>
+    <set parameter="APP_CROIE_1"       value="0xFFFF"/>
+    <set parameter="APP_CROIE_2"       value="0xFFFF"/>
+    <set parameter="APP_CROIE_3"       value="0xFFFF"/>
+    <set parameter="APP_CROIE_4"       value="0x003F"/>
+    <set parameter="APP_CROIE_5"       value="0x0000"/>
+
+    <set parameter="APP_FRM_PERIOD"    value="0"/> <!-- free running -->
+
+    <!-- set number of images to be read -->
+    <set parameter="MEM_NR_IMG_READ_0"  value="0"/>
+    <set parameter="MEM_NR_IMG_READ_1"  value="0"/>
+    <set parameter="MEM_NR_IMG_READ_2"  value="1"/>
+
+    <!-- set read/write start address -->
+    <set parameter="MEM_NR_IMG_START_0" value="0"/>
+    <set parameter="MEM_NR_IMG_START_1" value="0"/>
+    <set parameter="MEM_NR_IMG_START_2" value="0"/>
+    <set parameter="MEM_CTRL"           value="0"/> <!-- disable setting read/write address => done during reset -->
+
+    <!-- default exposureTime 5ms -->
+    <set parameter="sens_ETU"          value="750"/>
+    <set parameter="sens_TEXP"         value="750"/>
+
+    <!-- enable default Timings-->
+    <set parameter="sens_SEQ1_IR1"     value="0x0014"/>
+    <set parameter="sens_SEQ1_IR2"     value="0x0014"/>
+    <set parameter="sens_SEQ1_IR3"     value="0x0029"/>
+    <set parameter="sens_SEQ1_IR4"     value="0x0014"/>
+
+    <!-- enable bias and currents -->
+    <set parameter="sens_ABIAS"        value="0xF927"/>
+
+    <!-- ReferenceVoltagesDAC0/1 -->
+    <set parameter="DAC_sensor_vrefl_adc"     value="0.07"/>  <!--  0.05 -->
+    <set parameter="DAC_sensor_vrefh_adc"     value="1.902"/> <!-- 1.75 -->
+    <set parameter="DAC_sensor_vrefm_adc"     value="0.895"/> <!-- 0.895 leads to 0.9 -->
+    <set parameter="DAC_sensor_vrefl_cds"     value="1.8"/>
+    <set parameter="DAC_sensor_vref_cds"      value="0.954"/>
+    <set parameter="DAC_sensor_vdd50_rd"      value="4.3"/>
+    <set parameter="DAC_sensor_vdd50sel_rd"   value="4.3"/>
+    <set parameter="DAC_sensor_vtxl_ab"       value="0.754"/>
+    <set parameter="DAC_sensor_vtxh"          value="4.0"/>
+    <set parameter="DAC_sensor_vtxl"          value="0.0"/>
+    <set parameter="DAC_sensor_vrst"          value="2.5"/>
+    <set parameter="DAC_sensor_tpixpdin1"     value="1.5"/>
+    <set parameter="DAC_sensor_vdisch"        value="1.0"/>
+    <set parameter="DAC_sensor_spare2"        value="3.3"/>
+    <set parameter="DAC_sensor_spare1"        value="1.0"/>
+    <set parameter="DAC_sensor_tpixpdin0"     value="2.5"/>
+
+
+  </sequence>
+
+</paramConfig>
