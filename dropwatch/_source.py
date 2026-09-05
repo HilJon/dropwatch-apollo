@@ -17,6 +17,7 @@ from dropwatch.models import ApolloTransportError
 if TYPE_CHECKING:
     from dropwatch._hardware import FastEyeRLE
     from dropwatch._hardware import RLEDecoder
+    from dropwatch._hardware import RLEReadGate
 
 logger = logging.getLogger(__name__)
 
@@ -40,6 +41,7 @@ class _FastEyeApolloSource:
         self._settings = settings
         self._camera: FastEyeRLE | None = None
         self._decoder: RLEDecoder | None = None
+        self._read_gate: RLEReadGate | None = None
         self._decode_buffer: np.ndarray | None = None
         self._started = False
         self._needs_flush = False
@@ -105,6 +107,7 @@ class _FastEyeApolloSource:
         from dropwatch._hardware import RAW_FRAME_HEIGHT
         from dropwatch._hardware import RAW_FRAME_WIDTH
         from dropwatch._hardware import RLEDecoder
+        from dropwatch._hardware import RLEReadGate
 
         camera = self._camera
         try:
@@ -127,6 +130,7 @@ class _FastEyeApolloSource:
             else:
                 self._decode_buffer.fill(255)
             self._previous_frame_counter = None
+            self._read_gate = RLEReadGate(camera)
             # Flush resets RLE acquisition, so it must precede enabling it.
             camera.flush()
             camera.set_enc_mode()
@@ -147,26 +151,24 @@ class _FastEyeApolloSource:
             return self._read_started()
         except Exception:
             self._poisoned = True
+            if self._read_gate is not None:
+                self._read_gate.reset()
             raise
 
     def _read_started(self) -> np.ndarray | None:
         from dropwatch._hardware import DAQError
         from dropwatch._hardware import validate_rle_batch
 
-        if self._camera is None or self._decoder is None:
+        if self._camera is None or self._decoder is None or self._read_gate is None:
             raise RuntimeError("camera source is not available")
         camera = self._camera
         decoder = self._decoder
         try:
-            encoder_failed = camera.get_enc_error()
-            stored_images = camera.num_stored_images
+            ready = self._read_gate.poll()
         except DAQError as exc:
             self._record_transport_failure(last_vendor_error=str(exc))
             raise ApolloTransportError(f"could not query camera stream status: {exc}") from exc
-        if encoder_failed:
-            self._record_transport_failure()
-            raise ApolloTransportError("camera RLE encoder reported an error")
-        if stored_images < 1:
+        if not ready:
             return None
         if self._decode_buffer is None:
             raise RuntimeError("decode buffer is not available")
@@ -201,6 +203,8 @@ class _FastEyeApolloSource:
             try:
                 camera.read_image()
             except DAQReadError as exc:
+                if self._read_gate is not None:
+                    self._read_gate.reset()
                 if exc.actual_bytes != 0:
                     self._record_transport_failure(last_vendor_error=exc.vendor_error)
                     raise ApolloTransportError(
@@ -244,6 +248,7 @@ class _FastEyeApolloSource:
             self._started = False
             self._needs_flush = False
             self._previous_frame_counter = None
+            self._read_gate = None
         if self._poisoned and camera is not None:
             try:
                 camera.close()
@@ -267,6 +272,7 @@ class _FastEyeApolloSource:
         self._camera = None
         self._decode_buffer = None
         self._decoder = None
+        self._read_gate = None
         self._poisoned = False
         if stop_error is not None:
             raise stop_error

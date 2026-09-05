@@ -222,6 +222,7 @@ def test_no_data_never_passes_and_polling_is_bounded(tmp_path, rig):
     assert 0.03 <= clock.now < 0.04
     assert camera.read_count == 0
     assert camera.close_count == 1
+    assert report["summary"]["status_queries"]["minimum_ready_buffers"]["count"] > 1
 
 
 def test_short_test_with_no_transfers_does_not_pass(tmp_path, rig):
@@ -376,6 +377,7 @@ def test_dll_load_failure_is_reported_without_camera(tmp_path, rig, monkeypatch)
     "kwargs",
     [
         {"mode": "unknown"},
+        {"polling": "unknown"},
         {"duration_s": 0},
         {"duration_s": float("nan")},
         {"duration_s": float("inf")},
@@ -447,6 +449,8 @@ def test_cli_dispatch_and_exit_codes(tmp_path, rig, monkeypatch, capsys, bad):
             "1000",
             "--label",
             "camera A / port 1",
+            "--polling",
+            "legacy",
         ],
     )
     with pytest.raises(SystemExit) as exit_error:
@@ -456,6 +460,9 @@ def test_cli_dispatch_and_exit_codes(tmp_path, rig, monkeypatch, capsys, bad):
     assert report["settings"]["fps"] == 2000
     assert report["settings"]["read_timeout_ms"] == 1000
     assert report["settings"]["zero_byte_read_retries"] == 0
+    assert report["settings"]["polling"] == "legacy"
+    assert "num_stored_images" in report["summary"]["status_queries"]
+    assert "minimum_ready_buffers" not in report["summary"]["status_queries"]
     assert report["label"] == "camera A / port 1"
     assert "report:" in capsys.readouterr().out
 
@@ -492,13 +499,21 @@ def test_raw_status_accessors_keep_numeric_vendor_values():
 
     class DAQ:
         def get_int(self, name):
-            return {"encoderStatus": 5, "numImgAvail": 9, "numImgStored": 10}[name]
+            return {
+                "encoderStatus": 5,
+                "numImgAvail": 9,
+                "numImgStored": 10,
+                "APP_MODE": 0x88,
+                "ACCELERATOR_CTRL": 0xA0,
+            }[name]
 
     camera._daq = DAQ()
     assert camera.encoder_status == 5
     assert camera.get_enc_error()
     assert camera.num_available_images == 9
     assert camera.num_stored_images == 10
+    assert camera.acquisition_mode == 0x88
+    assert camera.accelerator_control == 0xA0
 
 
 def test_environment_fingerprints_bundle(monkeypatch, tmp_path):
@@ -507,4 +522,56 @@ def test_environment_fingerprints_bundle(monkeypatch, tmp_path):
     info = diagnostics._environment()
     assert len(info["bundle_sha256"]["PLabDAQCore.dll"]) == 64
     assert info["bundle_sha256"]["rlDecodeLib.dll"].startswith("unavailable")
+    for name in ("cfg/viamos/viamos_top.bin", "cfg/enclustra/fx3_app.img", "cfg/enclustra/PM3Manager.img"):
+        assert name in info["bundle_sha256"]
     assert info["python"]
+
+
+def test_reduced_polling_reports_cached_reads_and_each_query_duration(tmp_path, rig, monkeypatch):
+    camera, _decoder, clock = rig
+    camera.num_stored_images = 3
+
+    def encoder(_camera):
+        clock.sleep(0.01)
+        return 2
+
+    def ready(_camera):
+        clock.sleep(0.012)
+        return 3
+
+    monkeypatch.setattr(Camera, "encoder_status", property(encoder), raising=False)
+    monkeypatch.setattr(Camera, "minimum_ready_buffers", property(ready))
+    report, code = run(tmp_path)
+    assert code == 0
+    assert report["schema_version"] == 2
+    assert report["settings"]["polling"] == "reduced"
+    queries = report["summary"]["status_queries"]
+    assert queries["encoder_status"]["count"] == camera.read_count
+    assert queries["encoder_status"]["max_ms"] == pytest.approx(10)
+    assert queries["minimum_ready_buffers"]["max_ms"] == pytest.approx(12)
+    assert queries["minimum_ready_buffers"]["count"] < camera.read_count
+    assert report["summary"]["cached_ready_reads"] > 0
+    assert report["events"][1]["status_query_ms"] == {"encoder_status": pytest.approx(10)}
+    assert report["events"][1]["readiness_source"] == "cached_credit"
+    assert report["events"][1]["ready_buffer_credit"] == 2
+    assert "num_stored_images" not in report["events"][1]  # Not a fresh full-counter sample.
+
+
+def test_failed_status_query_timing_and_primary_error_survive_cleanup(tmp_path, rig, monkeypatch):
+    camera, _decoder, clock = rig
+
+    def fail(_camera):
+        clock.sleep(0.02)
+        raise DAQError("register read failed")
+
+    monkeypatch.setattr(Camera, "minimum_ready_buffers", property(fail))
+    report, code = run(tmp_path)
+    assert code == 1
+    assert report["error"]["message"] == "register read failed"
+    assert report["events"][0]["status_query_ms"]["minimum_ready_buffers"] == pytest.approx(20)
+    assert report["summary"]["status_queries"]["minimum_ready_buffers"]["count"] == 1
+    assert report["summary"]["read_attempts"] == 0
+    assert report["status_after_failure"]["acquisition_mode"] == 0x88
+    assert report["status_after_failure"]["accelerator_control"] == 0xA0
+    assert report["camera_closed"] is True
+    assert camera.payload is None

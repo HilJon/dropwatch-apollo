@@ -6,8 +6,9 @@ fault. It changes the usual acquisition settings, not the camera firmware.
 
 ## Run on the Windows acquisition PC
 
-Install version **0.2.2 or later**. Version 0.2.1 introduced this command but has
-a startup-order bug that can prevent any image transfer. From the updated source
+Install version **0.2.3 or later** for reduced polling and query timing. Version
+0.2.2 fixed the startup-order bug in 0.2.1 but still read four status registers
+before every buffer. From the updated source
 folder: `python -m pip install --upgrade .`. Verify the installed version with
 `python -c "import dropwatch; print(dropwatch.__version__)"`.
 Close other programs holding the camera, including another Dropwatch process.
@@ -43,21 +44,31 @@ report file; that is not a passed test. There are no background worker threads.
 Each run creates a unique JSON file in `apollo_diagnostics` (change with
 `--output`). Send the reports from successful runs too, together with the actual
 camera firmware, driver version and USB/cable arrangement. `--label` records
-these notes. Bundle hashes identify the host DLL/config files, **not** the
+these notes. Bundle hashes identify the host DLL/config/FPGA/FX3 files, **not** the
 firmware actually loaded on the camera.
 
 The report includes:
 
-- Settings, host/Python/package information and DLL/config SHA-256 hashes.
+- Settings, host/Python/package information and DLL/config/FPGA/FX3 SHA-256 hashes.
 - Cumulative read counts, byte counts, zero/short reads and empty status polls.
 - The last 500 read/error events, including the failing one; use
   `--history-size` to change this bound (1..10000). No image arrays are retained.
 - Requested/returned bytes, read duration and delay since the previous read.
   `read_ms` times `read_image()`, including buffer clearing and vendor error
   retrieval, not just USB bus time. `decode_ms` includes integrity validation.
-- Numeric encoder status and stored-image count before reads. A best-effort
-  status snapshot is taken after a failure, before cleanup. The original vendor
-  error is captured **before** these additional queries can overwrite it.
+- Numeric encoder status before every read, including reads using cached readiness.
+  Schema 2 reports `readiness_source` and `ready_buffer_credit` (a lower bound,
+  **not** an exact backlog). Fresh queries include `minimum_ready_buffers` in
+  reduced mode or `num_stored_images` in legacy mode. Cached values are never
+  labelled as a fresh full-counter sample.
+- Per-query `status_query_ms` and cumulative `summary.status_queries` (count,
+  total and maximum duration), including empty polls and failed queries. These
+  time Python-to-vendor property calls, not individual USB packets; for example
+  legacy `num_stored_images` includes three register reads. `cached_ready_reads`
+  counts read attempts that used an earlier confirmed buffer count.
+- A best-effort status snapshot after a failure, before cleanup, including the
+  full stored count, `APP_MODE` and `ACCELERATOR_CTRL`. The original vendor error
+  is captured **before** these additional queries can overwrite it.
 - In decode mode: validated frame count and last 15-bit frame counter per batch.
 - Original failure, cleanup errors and whether camera close succeeded.
 
@@ -67,6 +78,8 @@ are never overwritten. The transport buffer is reused; decode mode adds one
 reused destination (~109 MiB at 100 frames). Both are released on return. If the
 vendor refuses to close its handle, the report explicitly says so; one additional
 close attempt is made during cleanup, without restarting or rereading.
+Readiness credits hold no image data and are discarded after a fault or stop;
+the recorder also clears them before a retry/restart can reuse stale readiness.
 
 Exit codes: **0** = the selected test passed for this run; **1** = hardware,
 stream or cleanup failure; **130** = interrupted; **2** = invalid arguments.
@@ -80,6 +93,35 @@ test discards images and stops at its deadline without draining the final batch;
 it is not a substitute for recorder/stop qualification in `HARDWARE_ACCEPTANCE.md`.
 
 ## Controlled follow-up tests
+
+### Compare polling overhead
+
+Reduced polling is the default in both diagnostics and normal acquisition.
+It reads the low byte of the FPGA stored-buffer counter first. A nonzero byte
+provides a conservative lower bound with one query. When it is zero, upper bytes
+are checked too, so a count of 256 is not treated as empty. Independently sampled
+bytes are never combined into a potentially overestimated count. This requires
+one host reader; do not share the camera with another program.
+
+Up to eight confirmed buffers may be drained before refreshing readiness, one
+read per loop iteration. **Encoder status is still checked before every read.**
+Byte counts, read timeouts and decoder/counter checks are unchanged. No extra
+read trigger, reset, retry or firmware change is introduced.
+
+Use `--polling legacy` to compare the full counter query before every read with
+the 0.2.2 strategy. Keep all other conditions the same and compare both frame rates:
+
+```powershell
+dwa diagnose --mode transport --fps 2000 --duration 60 --polling reduced --label "reduced polling"
+dwa diagnose --mode transport --fps 2000 --duration 60 --polling legacy --label "legacy comparison"
+```
+
+At 2,000 fps / 100-frame flushes, a new buffer arrives about every 50 ms. The
+0.2.2 hardware reports measured about 43 ms for status queries plus 29 ms for a
+read. This is a throughput problem; a longer read timeout does not increase the
+loop's capacity. The reduced path passed a synthetic bounded-queue timing test,
+but must still be qualified on the acquisition PC, including the separate
+1,000 fps stall. A transport-only pass does not qualify decoded frames or videos.
 
 ### Timeout before the first image read
 
@@ -113,9 +155,9 @@ without a successful transfer; a run receiving no data never passes.
 
 `--extended-status` adds `numImgAvail` before each read and all three status
 values after each read. These extra vendor calls change timing, so use this as a
-separate comparison, not the initial baseline. Neither `numImgStored > 0` nor
-`numImgAvail` is proven to mean a complete RLE transfer is ready; the baseline
-deliberately uses Apollo's existing readiness rule rather than guessing a new one.
+separate comparison, not the initial baseline. `numImgAvail` is host-side trigger/
+read bookkeeping and is never used as a readiness predicate. Negative values
+are expected in continuous RLE mode: one initial trigger, then many reads.
 
 An error near the read timeout suggests investigating readiness/flush timing or
 missing data. A long gap before the failing read suggests checking host delays

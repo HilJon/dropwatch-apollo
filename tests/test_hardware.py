@@ -24,6 +24,9 @@ class FakeFastEye:
         self.serial_nr = 123
         self.rle_enabled = False
         self.stream_running = False
+        self.encoder_status = 0
+        self.acquisition_mode = 0
+        self.accelerator_control = 0
         self.sync_commands: list[str] = []
         self.num_stored_images = 1
         self.frame_period = None
@@ -47,6 +50,15 @@ class FakeFastEye:
     @num_stored_images.setter
     def num_stored_images(self, value: int) -> None:
         self._num_stored_images = value
+
+    @property
+    def minimum_ready_buffers(self) -> int:
+        stored = self._num_stored_images if self.stream_running else 0
+        for index in range(3):
+            value = (stored >> (index * 8)) & 255
+            if value:
+                return value << (index * 8)
+        return 0
 
     def open(self) -> None:
         self.open_count += 1
@@ -72,6 +84,8 @@ class FakeFastEye:
     def set_enc_mode(self) -> None:
         self.sync_commands.append("rle")
         self.rle_enabled = True
+        self.acquisition_mode = 0x88
+        self.accelerator_control = 0xA0
 
     def trig_frame(self) -> None:
         self.sync_commands.append("frame")
@@ -96,6 +110,8 @@ class FakeFastEye:
         # Vendor flush resets RLE acquisition; it is not just a host-buffer clear.
         self.rle_enabled = False
         self.stream_running = False
+        self.acquisition_mode = 0
+        self.accelerator_control = 0
 
     def close(self) -> None:
         self.close_count += 1
@@ -259,6 +275,72 @@ def test_fasteye_adapter_recovers_one_zero_byte_read_without_flushing(monkeypatc
     assert source.diagnostics.last_vendor_error == "USB timeout"
     assert source.diagnostics.last_frame_counter == 1
     source.close()
+
+
+def test_zero_byte_retry_invalidates_cached_readiness(monkeypatch):
+    camera = FakeFastEye()
+    camera.num_stored_images = 3
+    camera.read_results = [DAQReadError(0, 80, "timeout"), None]
+    monkeypatch.setattr(FakeDecoder, "return_code", 1)
+    monkeypatch.setattr(FakeDecoder, "generated_bytes_override", None)
+    monkeypatch.setattr(FakeDecoder, "consumed_bytes_override", None)
+    monkeypatch.setattr("dropwatch._hardware.FastEyeRLE", lambda: camera)
+    monkeypatch.setattr("dropwatch._hardware.RLEDecoder", FakeDecoder)
+    source = _FastEyeApolloSource(ApolloSettings(max_number_frames=20, zero_byte_retry_delay_ms=0))
+    try:
+        source.start()
+        assert source.read() is not None
+        camera.num_stored_images = 0
+        assert source.read() is None  # No use of credits from before the failed read.
+        assert camera.read_count == 2
+        assert camera.sync_commands == ["flush", "rle", "frame"]
+    finally:
+        source.close()
+    assert source._read_gate is None
+
+
+def test_fasteye_checks_encoder_errors_while_draining_cached_buffers(monkeypatch):
+    camera = FakeFastEye()
+    camera.num_stored_images = 3
+    monkeypatch.setattr(FakeDecoder, "return_code", 1)
+    monkeypatch.setattr(FakeDecoder, "generated_bytes_override", None)
+    monkeypatch.setattr(FakeDecoder, "consumed_bytes_override", None)
+    monkeypatch.setattr("dropwatch._hardware.FastEyeRLE", lambda: camera)
+    monkeypatch.setattr("dropwatch._hardware.RLEDecoder", FakeDecoder)
+    source = _FastEyeApolloSource(ApolloSettings(max_number_frames=20))
+    try:
+        source.start()
+        assert source.read() is not None
+        camera.encoder_status = 4
+        with pytest.raises(ApolloTransportError, match="encoder reported status 4"):
+            source.read()
+        assert camera.read_count == 1
+        assert source.diagnostics.transport_failures == 1
+    finally:
+        source.close()
+    assert source._read_gate is source._camera is None
+
+
+def test_fasteye_discards_cached_readiness_between_acquisitions(monkeypatch):
+    camera = FakeFastEye()
+    camera.num_stored_images = 3
+    monkeypatch.setattr(FakeDecoder, "return_code", 1)
+    monkeypatch.setattr(FakeDecoder, "generated_bytes_override", None)
+    monkeypatch.setattr(FakeDecoder, "consumed_bytes_override", None)
+    monkeypatch.setattr("dropwatch._hardware.FastEyeRLE", lambda: camera)
+    monkeypatch.setattr("dropwatch._hardware.RLEDecoder", FakeDecoder)
+    source = _FastEyeApolloSource(ApolloSettings(max_number_frames=20))
+    try:
+        source.start()
+        assert source.read() is not None
+        source.stop()
+        assert source._read_gate is None
+        camera.num_stored_images = 0
+        source.start()
+        assert source.read() is None
+        assert camera.read_count == 1
+    finally:
+        source.close()
 
 
 def test_fasteye_adapter_rejects_repeated_zero_byte_reads_and_reopens(monkeypatch):

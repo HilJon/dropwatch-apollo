@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import ctypes
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
+from time import perf_counter
 from typing import Any
 
 import numpy as np
@@ -160,8 +162,34 @@ class FastEyeRLE:
         return self._daq.get_int("numImgAvail")
 
     @property
+    def minimum_ready_buffers(self) -> int:
+        """Read a conservative buffer count, normally with one register query.
+
+        The vendor's numImgStored reads all three bytes over USB. With one host
+        reader, the FPGA can only add buffers during this query. The first
+        nonzero byte is therefore a lower bound; never combine independently
+        sampled bytes, which could overestimate a counter crossing 255/65535.
+        Read upper bytes when needed so multiples of 256 are not mistaken for 0.
+        """
+        for index in range(3):
+            value = self._daq.get_int(f"MEM_NR_IMG_STORED_{index}")
+            if not 0 <= value <= 255:
+                raise DAQError(f"invalid stored-buffer counter byte {index}: {value}")
+            if value:
+                return value << (8 * index)
+        return 0
+
+    @property
     def encoder_status(self) -> int:
         return self._daq.get_int("encoderStatus")
+
+    @property
+    def acquisition_mode(self) -> int:
+        return self._daq.get_int("APP_MODE")
+
+    @property
+    def accelerator_control(self) -> int:
+        return self._daq.get_int("ACCELERATOR_CTRL")
 
     def configure(
         self,
@@ -222,6 +250,61 @@ class FastEyeRLE:
         finally:
             self._daq.frame = None
             self._encoded_data = None
+
+
+class RLEReadGate:
+    """Bounded readiness credits shared by the recorder and diagnostic loop.
+
+    Only confirmed buffers may be read. There is exactly one camera reader and
+    no automatic reset/retrigger here. Encoder errors are checked on EVERY poll,
+    including reads using cached credits. Reset credits after a read failure.
+    """
+
+    def __init__(self, camera: FastEyeRLE, *, legacy: bool = False, clock: Callable[[], float] | None = None) -> None:
+        self._camera = camera
+        self._legacy = legacy
+        self._clock = perf_counter if clock is None else clock
+        self._ready = 0
+
+    def reset(self) -> None:
+        self._ready = 0
+
+    def query(self, name: str, event: dict[str, Any] | None) -> int:
+        """Sample one status property and optionally time the complete vendor call."""
+        started = self._clock()
+        try:
+            value: int = getattr(self._camera, name)
+            if event is not None:
+                event[name] = value
+            return value
+        finally:
+            if event is not None:
+                event.setdefault("status_query_ms", {})[name] = (self._clock() - started) * 1000
+
+    def poll(self, event: dict[str, Any] | None = None) -> bool:
+        try:
+            status = self.query("encoder_status", event)
+            if status < 0 or status >= 4:
+                raise DAQError(f"camera RLE encoder reported status {status}")
+            if self._legacy or not self._ready:
+                name = "num_stored_images" if self._legacy else "minimum_ready_buffers"
+                available = self.query(name, event)
+                if not 0 <= available <= 0xFFFFFF:
+                    raise DAQError(f"invalid ready-buffer count: {available}")
+                # Bound each drain to eight confirmed buffers, regardless of backlog.
+                self._ready = min(available, 8)
+                readiness_source = "full_counter" if self._legacy else "counter_bytes"
+            else:
+                readiness_source = "cached_credit"
+            if event is not None:
+                event.update(readiness_source=readiness_source, ready_buffer_credit=self._ready)
+            if not self._ready:
+                return False
+            self._ready -= 1
+            return True
+        except BaseException:
+            self.reset()
+            raise
 
 
 class RLEDecoder:

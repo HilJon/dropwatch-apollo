@@ -28,6 +28,7 @@ from dropwatch._hardware import RAW_FRAME_WIDTH
 from dropwatch._hardware import DAQReadError
 from dropwatch._hardware import FastEyeRLE
 from dropwatch._hardware import RLEDecoder
+from dropwatch._hardware import RLEReadGate
 from dropwatch._hardware import validate_rle_batch
 from dropwatch.models import ApolloSettings
 from dropwatch.models import require_finite
@@ -47,7 +48,15 @@ def _error(error: BaseException) -> dict[str, Any]:
 
 def _environment() -> dict[str, Any]:
     hashes = {}
-    for name in ("PLabDAQCore.dll", "rlDecodeLib.dll", "cfg/enc_viamos", "cfg/viamos/fc/fc.xml"):
+    for name in (
+        "PLabDAQCore.dll",
+        "rlDecodeLib.dll",
+        "cfg/enc_viamos",
+        "cfg/viamos/fc/fc.xml",
+        "cfg/viamos/viamos_top.bin",
+        "cfg/enclustra/fx3_app.img",
+        "cfg/enclustra/PM3Manager.img",
+    ):
         try:
             hashes[name] = hashlib.sha256((CORE_PATH / name).read_bytes()).hexdigest()
         except OSError as error:
@@ -64,7 +73,13 @@ def _environment() -> dict[str, Any]:
 def _failure_status(camera: FastEyeRLE) -> dict[str, Any]:
     # Only after preserving the primary error: another vendor call can overwrite it.
     result: dict[str, Any] = {}
-    for name in ("encoder_status", "num_stored_images", "num_available_images"):
+    for name in (
+        "encoder_status",
+        "num_stored_images",
+        "num_available_images",
+        "acquisition_mode",
+        "accelerator_control",
+    ):
         try:
             result[name] = getattr(camera, name)
         except (Exception, KeyboardInterrupt) as error:
@@ -81,29 +96,29 @@ def _acquire(
     duration_s: float,
     idle_timeout_s: float,
     extended_status: bool,
+    polling: str,
 ) -> None:
     summary = report["summary"]
     started = last_data = perf_counter()
     previous_read_end: float | None = None
     previous_counter: int | None = None
+    gate = RLEReadGate(camera, legacy=polling == "legacy", clock=perf_counter)
     try:
         while perf_counter() - started < duration_s:
             event: dict[str, Any] = {"at_s": perf_counter() - started}
             appended = False
             try:
                 report["phase"] = "status"
-                event["encoder_status"] = camera.encoder_status
-                event["num_stored_images"] = camera.num_stored_images
-                if event["encoder_status"] >= 4:
-                    raise RuntimeError(f"camera RLE encoder reported status {event['encoder_status']}")
+                ready = gate.poll(event)
                 if perf_counter() - last_data >= idle_timeout_s:
                     raise TimeoutError(f"no successful transfer for {idle_timeout_s:g} seconds")
-                if event["num_stored_images"] < 1:
+                if not ready:
                     summary["empty_polls"] += 1
                     sleep(0.001)
                     continue
                 if extended_status:
-                    event["num_available_images"] = camera.num_available_images
+                    gate.query("num_available_images", event)
+                summary["cached_ready_reads"] += int(event["readiness_source"] == "cached_credit")
                 summary["read_attempts"] += 1
                 event.update(read=summary["read_attempts"], expected_bytes=ENCODED_BUFFER_BYTES)
                 events.append(event)
@@ -148,11 +163,9 @@ def _acquire(
                     summary["last_frame_counter"] = previous_counter
                 if extended_status:
                     report["phase"] = "status_after_read"
-                    event["status_after_read"] = {
-                        "encoder_status": camera.encoder_status,
-                        "num_stored_images": camera.num_stored_images,
-                        "num_available_images": camera.num_available_images,
-                    }
+                    event["status_after_read"] = {}
+                    for name in ("encoder_status", "num_stored_images", "num_available_images"):
+                        gate.query(name, event["status_after_read"])
                     if event["status_after_read"]["encoder_status"] >= 4:
                         raise RuntimeError("camera RLE encoder reported an error after read")
                 event["outcome"] = "ok"
@@ -163,11 +176,22 @@ def _acquire(
                 if not appended:
                     events.append(event)
                 raise
+            finally:
+                # Include empty polls and failed queries without retaining extra events.
+                for sample in (event, event.get("status_after_read", {})):
+                    for name, elapsed_ms in sample.get("status_query_ms", {}).items():
+                        totals = summary["status_queries"].setdefault(
+                            name, {"count": 0, "total_ms": 0.0, "max_ms": 0.0}
+                        )
+                        totals["count"] += 1
+                        totals["total_ms"] += elapsed_ms
+                        totals["max_ms"] = max(totals["max_ms"], elapsed_ms)
         if not summary["successful_reads"]:
             empty_error = TimeoutError("test ended without any successful camera transfer")
             events.append({"at_s": perf_counter() - started, "outcome": "failed", "error": _error(empty_error)})
             raise empty_error
     finally:
+        gate.reset()
         summary["acquisition_elapsed_s"] = perf_counter() - started
 
 
@@ -181,6 +205,7 @@ def run_diagnostics(
     idle_timeout_s: float = 5,
     extended_status: bool = False,
     label: str = "",
+    polling: str = "reduced",
 ) -> tuple[Path, int]:
     """Write one unique JSON report and return (path, exit code: 0, 1, or 130).
 
@@ -189,6 +214,8 @@ def run_diagnostics(
     """
     if mode not in {"transport", "decode"}:
         raise ValueError("mode must be transport or decode")
+    if polling not in {"reduced", "legacy"}:
+        raise ValueError("polling must be reduced or legacy")
     for name, value in (("duration_s", duration_s), ("idle_timeout_s", idle_timeout_s)):
         require_finite(name, value)
         if value <= 0:
@@ -203,7 +230,7 @@ def run_diagnostics(
         raise ValueError("diagnostic buffers exceed max_buffer_bytes")
 
     report: dict[str, Any] = {
-        "schema_version": 1,
+        "schema_version": 2,
         "started_at_utc": datetime.now(timezone.utc).isoformat(),
         "mode": mode,
         "label": label,
@@ -220,7 +247,12 @@ def run_diagnostics(
             "idle_timeout_s": idle_timeout_s,
             "history_size": history_size,
             "extended_status": extended_status,
-            "readiness_rule": "numImgStored > 0 (same as Apollo; vendor semantics unverified)",
+            "polling": polling,
+            "readiness_rule": (
+                "numImgStored > 0; full counter before every read"
+                if polling == "legacy"
+                else "conservative stored-counter bytes; drain at most 8 confirmed buffers; encoder checked every poll"
+            ),
             "reserved_image_buffer_bytes": decode_bytes + ENCODED_BUFFER_BYTES,
         },
         "summary": {
@@ -230,6 +262,8 @@ def run_diagnostics(
             "zero_byte_reads": 0,
             "short_reads": 0,
             "empty_polls": 0,
+            "cached_ready_reads": 0,
+            "status_queries": {},
             "decoded_frames": 0,
             "last_frame_counter": None,
             "max_read_ms": 0.0,
@@ -278,7 +312,7 @@ def run_diagnostics(
             camera.flush()
             camera.set_enc_mode()
             camera.trig_frame()
-            _acquire(camera, decoder, destination, report, events, duration_s, idle_timeout_s, extended_status)
+            _acquire(camera, decoder, destination, report, events, duration_s, idle_timeout_s, extended_status, polling)
             report.update(outcome="passed", phase="complete")
         except (Exception, KeyboardInterrupt) as error:
             report["error"] = {"phase": report["phase"], **_error(error)}
@@ -328,6 +362,12 @@ def main(argv: list[str]) -> None:
     parser.add_argument("--history-size", type=int, default=500, help="maximum retained events (1..10000)")
     parser.add_argument("--idle-timeout", type=float, default=5, help="fail after this many seconds without a transfer")
     parser.add_argument("--extended-status", action="store_true", help="extra pre/post-read queries; changes timing")
+    parser.add_argument(
+        "--polling",
+        choices=("reduced", "legacy"),
+        default="reduced",
+        help="readiness strategy; legacy is the 0.2.2 comparison baseline",
+    )
     parser.add_argument("--label", default="", help="notes: camera, firmware/driver, USB port/cable, scene")
     args = parser.parse_args(argv)
     try:
@@ -353,6 +393,7 @@ def main(argv: list[str]) -> None:
             idle_timeout_s=args.idle_timeout,
             extended_status=args.extended_status,
             label=args.label,
+            polling=args.polling,
         )
     except ValueError as error:
         parser.error(str(error))

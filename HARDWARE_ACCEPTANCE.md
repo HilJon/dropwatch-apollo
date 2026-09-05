@@ -140,6 +140,11 @@ Run at least 100 `start()` / `get_sequence()` / `stop()` cycles on the same
 
 ## Release decision
 
+For the 0.2.3 polling change, run the reduced/legacy comparison in `DIAGNOSTICS.md`
+at 1,000 and 2,000 fps. Confirm stable transfers, bounded backlog and continuous
+decoded counters, then repeat the same-instance start/stop and production
+recording tests. A passing synthetic timing model is not a hardware pass.
+
 Record the tested camera firmware, PLabDAQ DLL version, frame rates, final
 trigger settings, `rle_batch_frames`, memory limit, peak RSS, and cycle count.
 Keep the qualified DLL/configuration bundle together with its recorded version.
