@@ -1,0 +1,1 @@
+"""Configuration-only compatibility objects."""

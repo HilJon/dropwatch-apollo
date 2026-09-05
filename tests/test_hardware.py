@@ -7,16 +7,16 @@ from typing import ClassVar
 import numpy as np
 import pytest
 
-from dropwatch import ApolloFrameLossError
-from dropwatch import ApolloSettings
-from dropwatch import ApolloTransportError
-from dropwatch._hardware import _DAQ
-from dropwatch._hardware import DAQError
-from dropwatch._hardware import DAQReadError
-from dropwatch._hardware import FastEyeRLE
-from dropwatch._hardware import RLEDecoder
-from dropwatch._hardware import RLEDecodeResult
-from dropwatch._source import _FastEyeApolloSource
+from dropwatch_apollo import ApolloFrameLossError
+from dropwatch_apollo import ApolloSettings
+from dropwatch_apollo import ApolloTransportError
+from dropwatch_apollo._hardware import _DAQ
+from dropwatch_apollo._hardware import DAQError
+from dropwatch_apollo._hardware import DAQReadError
+from dropwatch_apollo._hardware import FastEyeRLE
+from dropwatch_apollo._hardware import RLEDecoder
+from dropwatch_apollo._hardware import RLEDecodeResult
+from dropwatch_apollo._source import _FastEyeApolloSource
 
 
 class FakeFastEye:
@@ -140,7 +140,7 @@ class FakeDecoder:
             return RLEDecodeResult(self.return_code, 0, 0)
         destination[: self.return_code, :, :1120] = 7
         # Simulate foreground in the discarded right view. It must never reach
-        # Apollo's trigger, sequence, or video boundary.
+        # Dropwatch Apollo's trigger, sequence, or video boundary.
         destination[: self.return_code, :, 1120:] = 0
         generated_bytes = self.return_code * 512 * 2240
         if self.generated_bytes_override is not None:
@@ -179,8 +179,8 @@ def test_fasteye_start_flushes_before_enabling_rle_on_every_acquisition(monkeypa
     monkeypatch.setattr(FakeDecoder, "return_code", 1)
     monkeypatch.setattr(FakeDecoder, "generated_bytes_override", None)
     monkeypatch.setattr(FakeDecoder, "consumed_bytes_override", None)
-    monkeypatch.setattr("dropwatch._hardware.FastEyeRLE", lambda: camera)
-    monkeypatch.setattr("dropwatch._hardware.RLEDecoder", FakeDecoder)
+    monkeypatch.setattr("dropwatch_apollo._hardware.FastEyeRLE", lambda: camera)
+    monkeypatch.setattr("dropwatch_apollo._hardware.RLEDecoder", FakeDecoder)
     source = _FastEyeApolloSource(ApolloSettings(max_number_frames=20, frame_period_ms=frame_period_ms))
 
     try:
@@ -209,8 +209,8 @@ def test_fasteye_adapter_returns_one_view_and_reuses_decode_buffer(
     FakeDecoder.return_code = 1
     FakeDecoder.generated_bytes_override = None
     FakeDecoder.consumed_bytes_override = None
-    monkeypatch.setattr("dropwatch._hardware.FastEyeRLE", lambda: fake_camera)
-    monkeypatch.setattr("dropwatch._hardware.RLEDecoder", FakeDecoder)
+    monkeypatch.setattr("dropwatch_apollo._hardware.FastEyeRLE", lambda: fake_camera)
+    monkeypatch.setattr("dropwatch_apollo._hardware.RLEDecoder", FakeDecoder)
     source = _FastEyeApolloSource(ApolloSettings(max_number_frames=20))
 
     source.open()
@@ -253,8 +253,8 @@ def test_fasteye_adapter_recovers_one_zero_byte_read_without_flushing(monkeypatc
     FakeDecoder.return_code = 1
     FakeDecoder.generated_bytes_override = None
     FakeDecoder.consumed_bytes_override = None
-    monkeypatch.setattr("dropwatch._hardware.FastEyeRLE", lambda: fake_camera)
-    monkeypatch.setattr("dropwatch._hardware.RLEDecoder", FakeDecoder)
+    monkeypatch.setattr("dropwatch_apollo._hardware.FastEyeRLE", lambda: fake_camera)
+    monkeypatch.setattr("dropwatch_apollo._hardware.RLEDecoder", FakeDecoder)
     source = _FastEyeApolloSource(
         ApolloSettings(max_number_frames=20, zero_byte_read_retries=1, zero_byte_retry_delay_ms=0)
     )
@@ -284,8 +284,8 @@ def test_zero_byte_retry_invalidates_cached_readiness(monkeypatch):
     monkeypatch.setattr(FakeDecoder, "return_code", 1)
     monkeypatch.setattr(FakeDecoder, "generated_bytes_override", None)
     monkeypatch.setattr(FakeDecoder, "consumed_bytes_override", None)
-    monkeypatch.setattr("dropwatch._hardware.FastEyeRLE", lambda: camera)
-    monkeypatch.setattr("dropwatch._hardware.RLEDecoder", FakeDecoder)
+    monkeypatch.setattr("dropwatch_apollo._hardware.FastEyeRLE", lambda: camera)
+    monkeypatch.setattr("dropwatch_apollo._hardware.RLEDecoder", FakeDecoder)
     source = _FastEyeApolloSource(ApolloSettings(max_number_frames=20, zero_byte_retry_delay_ms=0))
     try:
         source.start()
@@ -305,8 +305,8 @@ def test_fasteye_checks_encoder_errors_while_draining_cached_buffers(monkeypatch
     monkeypatch.setattr(FakeDecoder, "return_code", 1)
     monkeypatch.setattr(FakeDecoder, "generated_bytes_override", None)
     monkeypatch.setattr(FakeDecoder, "consumed_bytes_override", None)
-    monkeypatch.setattr("dropwatch._hardware.FastEyeRLE", lambda: camera)
-    monkeypatch.setattr("dropwatch._hardware.RLEDecoder", FakeDecoder)
+    monkeypatch.setattr("dropwatch_apollo._hardware.FastEyeRLE", lambda: camera)
+    monkeypatch.setattr("dropwatch_apollo._hardware.RLEDecoder", FakeDecoder)
     source = _FastEyeApolloSource(ApolloSettings(max_number_frames=20))
     try:
         source.start()
@@ -327,8 +327,8 @@ def test_fasteye_discards_cached_readiness_between_acquisitions(monkeypatch):
     monkeypatch.setattr(FakeDecoder, "return_code", 1)
     monkeypatch.setattr(FakeDecoder, "generated_bytes_override", None)
     monkeypatch.setattr(FakeDecoder, "consumed_bytes_override", None)
-    monkeypatch.setattr("dropwatch._hardware.FastEyeRLE", lambda: camera)
-    monkeypatch.setattr("dropwatch._hardware.RLEDecoder", FakeDecoder)
+    monkeypatch.setattr("dropwatch_apollo._hardware.FastEyeRLE", lambda: camera)
+    monkeypatch.setattr("dropwatch_apollo._hardware.RLEDecoder", FakeDecoder)
     source = _FastEyeApolloSource(ApolloSettings(max_number_frames=20))
     try:
         source.start()
@@ -354,8 +354,8 @@ def test_fasteye_adapter_rejects_repeated_zero_byte_reads_and_reopens(monkeypatc
     FakeDecoder.return_code = 1
     FakeDecoder.generated_bytes_override = None
     FakeDecoder.consumed_bytes_override = None
-    monkeypatch.setattr("dropwatch._hardware.FastEyeRLE", lambda: next(cameras))
-    monkeypatch.setattr("dropwatch._hardware.RLEDecoder", FakeDecoder)
+    monkeypatch.setattr("dropwatch_apollo._hardware.FastEyeRLE", lambda: next(cameras))
+    monkeypatch.setattr("dropwatch_apollo._hardware.RLEDecoder", FakeDecoder)
     source = _FastEyeApolloSource(
         ApolloSettings(max_number_frames=20, zero_byte_read_retries=1, zero_byte_retry_delay_ms=0)
     )
@@ -378,8 +378,8 @@ def test_fasteye_adapter_rejects_repeated_zero_byte_reads_and_reopens(monkeypatc
 def test_fasteye_adapter_never_retries_a_positive_partial_read(monkeypatch):
     fake_camera = FakeFastEye()
     fake_camera.read_results = [DAQReadError(40, 80, "short USB transfer"), None]
-    monkeypatch.setattr("dropwatch._hardware.FastEyeRLE", lambda: fake_camera)
-    monkeypatch.setattr("dropwatch._hardware.RLEDecoder", FakeDecoder)
+    monkeypatch.setattr("dropwatch_apollo._hardware.FastEyeRLE", lambda: fake_camera)
+    monkeypatch.setattr("dropwatch_apollo._hardware.RLEDecoder", FakeDecoder)
     source = _FastEyeApolloSource(ApolloSettings(max_number_frames=20, zero_byte_read_retries=3))
 
     source.open()
@@ -399,8 +399,8 @@ def test_fasteye_adapter_rejects_zero_decoded_frames(monkeypatch):
     FakeDecoder.return_code = 0
     FakeDecoder.generated_bytes_override = None
     FakeDecoder.consumed_bytes_override = None
-    monkeypatch.setattr("dropwatch._hardware.FastEyeRLE", lambda: fake_camera)
-    monkeypatch.setattr("dropwatch._hardware.RLEDecoder", FakeDecoder)
+    monkeypatch.setattr("dropwatch_apollo._hardware.FastEyeRLE", lambda: fake_camera)
+    monkeypatch.setattr("dropwatch_apollo._hardware.RLEDecoder", FakeDecoder)
     source = _FastEyeApolloSource(ApolloSettings(max_number_frames=20))
 
     source.open()
@@ -414,8 +414,8 @@ def test_fasteye_adapter_rejects_zero_decoded_frames(monkeypatch):
 def test_fasteye_adapter_reports_rle_decode_error(monkeypatch):
     fake_camera = FakeFastEye()
     FakeDecoder.return_code = -7
-    monkeypatch.setattr("dropwatch._hardware.FastEyeRLE", lambda: fake_camera)
-    monkeypatch.setattr("dropwatch._hardware.RLEDecoder", FakeDecoder)
+    monkeypatch.setattr("dropwatch_apollo._hardware.FastEyeRLE", lambda: fake_camera)
+    monkeypatch.setattr("dropwatch_apollo._hardware.RLEDecoder", FakeDecoder)
     source = _FastEyeApolloSource(ApolloSettings(max_number_frames=20))
 
     source.open()
@@ -433,7 +433,7 @@ def test_fasteye_adapter_flushes_after_incomplete_start(monkeypatch):
         raise RuntimeError("configuration failed")
 
     fake_camera.configure = fail_configuration  # type: ignore[method-assign]
-    monkeypatch.setattr("dropwatch._hardware.FastEyeRLE", lambda: fake_camera)
+    monkeypatch.setattr("dropwatch_apollo._hardware.FastEyeRLE", lambda: fake_camera)
     source = _FastEyeApolloSource(ApolloSettings(max_number_frames=20))
 
     source.open()
@@ -455,8 +455,8 @@ def test_fasteye_start_flush_failure_never_enables_or_triggers(monkeypatch):
             raise DAQError("startup flush failed")
 
     monkeypatch.setattr(camera, "flush", fail_first_flush)
-    monkeypatch.setattr("dropwatch._hardware.FastEyeRLE", lambda: camera)
-    monkeypatch.setattr("dropwatch._hardware.RLEDecoder", FakeDecoder)
+    monkeypatch.setattr("dropwatch_apollo._hardware.FastEyeRLE", lambda: camera)
+    monkeypatch.setattr("dropwatch_apollo._hardware.RLEDecoder", FakeDecoder)
     source = _FastEyeApolloSource(ApolloSettings(max_number_frames=20))
     try:
         with pytest.raises(DAQError, match="startup flush failed"):
@@ -476,8 +476,8 @@ def test_fasteye_adapter_rejects_frame_counter_gap(monkeypatch):
     fake_camera.frame_counters = [10, 12]
     FakeDecoder.return_code = 2
     FakeDecoder.generated_bytes_override = None
-    monkeypatch.setattr("dropwatch._hardware.FastEyeRLE", lambda: fake_camera)
-    monkeypatch.setattr("dropwatch._hardware.RLEDecoder", FakeDecoder)
+    monkeypatch.setattr("dropwatch_apollo._hardware.FastEyeRLE", lambda: fake_camera)
+    monkeypatch.setattr("dropwatch_apollo._hardware.RLEDecoder", FakeDecoder)
     source = _FastEyeApolloSource(ApolloSettings(max_number_frames=20))
 
     source.open()
@@ -494,8 +494,8 @@ def test_zero_byte_retry_still_rejects_a_frame_counter_gap(monkeypatch):
     FakeDecoder.return_code = 1
     FakeDecoder.generated_bytes_override = None
     FakeDecoder.consumed_bytes_override = None
-    monkeypatch.setattr("dropwatch._hardware.FastEyeRLE", lambda: fake_camera)
-    monkeypatch.setattr("dropwatch._hardware.RLEDecoder", FakeDecoder)
+    monkeypatch.setattr("dropwatch_apollo._hardware.FastEyeRLE", lambda: fake_camera)
+    monkeypatch.setattr("dropwatch_apollo._hardware.RLEDecoder", FakeDecoder)
     source = _FastEyeApolloSource(
         ApolloSettings(max_number_frames=20, zero_byte_read_retries=1, zero_byte_retry_delay_ms=0)
     )
@@ -515,8 +515,8 @@ def test_fasteye_adapter_rejects_incomplete_decoder_output(monkeypatch):
     fake_camera = FakeFastEye()
     FakeDecoder.return_code = 1
     FakeDecoder.generated_bytes_override = 0
-    monkeypatch.setattr("dropwatch._hardware.FastEyeRLE", lambda: fake_camera)
-    monkeypatch.setattr("dropwatch._hardware.RLEDecoder", FakeDecoder)
+    monkeypatch.setattr("dropwatch_apollo._hardware.FastEyeRLE", lambda: fake_camera)
+    monkeypatch.setattr("dropwatch_apollo._hardware.RLEDecoder", FakeDecoder)
     source = _FastEyeApolloSource(ApolloSettings(max_number_frames=20))
 
     source.open()
@@ -533,8 +533,8 @@ def test_fasteye_adapter_rejects_unconsumed_rle_input(monkeypatch):
     FakeDecoder.return_code = 1
     FakeDecoder.generated_bytes_override = None
     FakeDecoder.consumed_bytes_override = 40
-    monkeypatch.setattr("dropwatch._hardware.FastEyeRLE", lambda: fake_camera)
-    monkeypatch.setattr("dropwatch._hardware.RLEDecoder", FakeDecoder)
+    monkeypatch.setattr("dropwatch_apollo._hardware.FastEyeRLE", lambda: fake_camera)
+    monkeypatch.setattr("dropwatch_apollo._hardware.RLEDecoder", FakeDecoder)
     source = _FastEyeApolloSource(ApolloSettings(max_number_frames=20))
 
     source.open()
@@ -550,8 +550,8 @@ def test_fasteye_adapter_accepts_only_zero_unconsumed_padding(monkeypatch):
     monkeypatch.setattr(FakeDecoder, "return_code", 1)
     monkeypatch.setattr(FakeDecoder, "generated_bytes_override", None)
     monkeypatch.setattr(FakeDecoder, "consumed_bytes_override", 40)
-    monkeypatch.setattr("dropwatch._hardware.FastEyeRLE", lambda: fake_camera)
-    monkeypatch.setattr("dropwatch._hardware.RLEDecoder", FakeDecoder)
+    monkeypatch.setattr("dropwatch_apollo._hardware.FastEyeRLE", lambda: fake_camera)
+    monkeypatch.setattr("dropwatch_apollo._hardware.RLEDecoder", FakeDecoder)
     source = _FastEyeApolloSource(ApolloSettings(max_number_frames=20))
     source.start()
     assert len(source.read()) == 1
@@ -566,8 +566,8 @@ def test_failed_poisoned_handle_close_is_retained_for_retry(monkeypatch):
                 raise DAQError("close failed")
 
     camera = RetryCloseCamera()
-    monkeypatch.setattr("dropwatch._hardware.FastEyeRLE", lambda: camera)
-    monkeypatch.setattr("dropwatch._hardware.RLEDecoder", FakeDecoder)
+    monkeypatch.setattr("dropwatch_apollo._hardware.FastEyeRLE", lambda: camera)
+    monkeypatch.setattr("dropwatch_apollo._hardware.RLEDecoder", FakeDecoder)
     source = _FastEyeApolloSource(ApolloSettings(max_number_frames=20))
     source.start()
     source._poisoned = True
@@ -770,8 +770,8 @@ def test_fasteye_frame_counter_wrap_is_contiguous(monkeypatch):
     fake_camera.frame_counters = [32767]
     FakeDecoder.return_code = 1
     FakeDecoder.generated_bytes_override = None
-    monkeypatch.setattr("dropwatch._hardware.FastEyeRLE", lambda: fake_camera)
-    monkeypatch.setattr("dropwatch._hardware.RLEDecoder", FakeDecoder)
+    monkeypatch.setattr("dropwatch_apollo._hardware.FastEyeRLE", lambda: fake_camera)
+    monkeypatch.setattr("dropwatch_apollo._hardware.RLEDecoder", FakeDecoder)
     source = _FastEyeApolloSource(ApolloSettings(max_number_frames=20))
 
     source.open()

@@ -4,8 +4,8 @@ import cv2
 import numpy as np
 import pytest
 
-from dropwatch import DropwatchApollo
-from dropwatch.__main__ import main
+from dropwatch_apollo import DropwatchApollo
+from dropwatch_apollo.__main__ import main
 from tests._support import FakeFrameSource
 
 
@@ -23,7 +23,7 @@ def test_cli_real_capture_export_and_replay(command, tmp_path, monkeypatch):
     source.feed(list(frames))
     recorder = DropwatchApollo
     monkeypatch.setattr(
-        "dropwatch.__main__.DropwatchApollo",
+        "dropwatch_apollo.__main__.DropwatchApollo",
         lambda settings, frame_source=None: recorder(
             settings, frame_source=frame_source if frame_source is not None else source
         ),

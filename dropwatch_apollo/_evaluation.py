@@ -1,4 +1,4 @@
-"""Bounded single-worker evaluation for completed Apollo sequences."""
+"""Bounded single-worker evaluation for completed Dropwatch Apollo sequences."""
 
 from __future__ import annotations
 
@@ -6,13 +6,14 @@ import importlib
 import queue
 import threading
 import time
+from collections.abc import Callable
 from typing import Any
 
-from dropwatch._capture import _CapturedSequence
-from dropwatch.models import ApolloEvaluationError
-from dropwatch.models import ApolloLifecycleError
-from dropwatch.models import ApolloSequenceEvaluator
-from dropwatch.models import require_finite
+from dropwatch_apollo._capture import _CapturedSequence
+from dropwatch_apollo.models import ApolloEvaluationError
+from dropwatch_apollo.models import ApolloLifecycleError
+from dropwatch_apollo.models import ApolloSequenceEvaluator
+from dropwatch_apollo.models import require_finite
 
 
 class _EvaluationRunner:
@@ -21,8 +22,11 @@ class _EvaluationRunner:
     _POLL_INTERVAL_S = 0.05
     _STOP_TIMEOUT_S = 5.0
 
-    def __init__(self, evaluator: ApolloSequenceEvaluator | None) -> None:
+    def __init__(
+        self, evaluator: ApolloSequenceEvaluator | None, finalizer: Callable[[Any], Any] | None = None
+    ) -> None:
         self._evaluator = evaluator
+        self._finalizer = finalizer
         self._lock = threading.Lock()
         self._done = threading.Event()
         self._cancel = threading.Event()
@@ -138,6 +142,10 @@ class _EvaluationRunner:
                 indexed_frame["shot"] = shot
                 indexed_frames.append(indexed_frame)
             result = pandas.concat(indexed_frames, ignore_index=True) if indexed_frames else pandas.DataFrame()
+            if self._finalizer is not None:
+                result = self._finalizer(result)
+                if not isinstance(result, pandas.DataFrame):
+                    raise TypeError("evaluation finalizer must return pandas.DataFrame")
         except Exception as exc:
             self.reset()
             raise ApolloEvaluationError("could not combine sequence evaluation results") from exc
@@ -152,7 +160,7 @@ class _EvaluationRunner:
             if worker.is_alive():
                 return ApolloLifecycleError(
                     f"sequence evaluator did not stop within {self._STOP_TIMEOUT_S}s; "
-                    "the camera was closed, but this Apollo instance cannot be reused"
+                    "the camera was closed, but this Dropwatch Apollo instance cannot be reused"
                 )
         with self._lock:
             error = self._error

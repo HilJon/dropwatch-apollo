@@ -4,10 +4,10 @@ import ctypes
 
 import pytest
 
-from dropwatch._hardware import DAQError
-from dropwatch._hardware import DAQReadError
-from dropwatch._hardware import FastEyeRLE
-from dropwatch._hardware import RLEReadGate
+from dropwatch_apollo._hardware import DAQError
+from dropwatch_apollo._hardware import DAQReadError
+from dropwatch_apollo._hardware import FastEyeRLE
+from dropwatch_apollo._hardware import RLEReadGate
 
 
 @pytest.mark.parametrize(

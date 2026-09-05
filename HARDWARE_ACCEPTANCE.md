@@ -1,15 +1,15 @@
 # Dropwatch Apollo hardware acceptance
 
-The Apollo implementation is unit-tested without a camera. The following items
-must be verified on the Windows acquisition PC before Apollo is considered
+The Dropwatch Apollo implementation is unit-tested without a camera. The following items
+must be verified on the Windows acquisition PC before Dropwatch Apollo is considered
 hardware-qualified.
 
 ## Image and trigger geometry
 
-- Confirm that the Apollo image is the first 1120-pixel half of the decoded
+- Confirm that the Dropwatch Apollo image is the first 1120-pixel half of the decoded
   `512 x 2240` FastEye RLE frame.
 - Put a foreground target in only the second half and confirm it neither
-  triggers Apollo nor appears in a returned sequence or video.
+  triggers Dropwatch Apollo nor appears in a returned sequence or video.
 - Confirm raw NumPy orientation and zero/nonzero polarity. Videos and PNGs
   transpose once into physical orientation.
 - Verify 960 x 1024 transport geometry and reqBufSize=1228800, distinct from
@@ -18,12 +18,12 @@ hardware-qualified.
   `trigger_width_px`, `trigger_on_pixels`, and `trigger_off_pixels`.
 - Check that the trigger image is returned at index `pre_trigger`.
 
-Apollo defaults to `trigger_from_top=False` and
-`trigger_position_px=300`. This reproduces the previous bottom-oriented Apollo
+Dropwatch Apollo defaults to `trigger_from_top=False` and
+`trigger_position_px=300`. This reproduces the previous bottom-oriented Dropwatch Apollo
 trigger. It is an implementation starting point, not a calibrated hardware
 value.
 
-Call `set_trigger_size(width=100)` while Apollo is idle to replace that starting
+Call `set_trigger_size(width=100)` while Dropwatch Apollo is idle to replace that starting
 value automatically. It takes one RLE snapshot, finds the highest foreground
 connected to the physical lower image edge, and places a 100-pixel
 trigger band directly above it. On the target setup, verify that:

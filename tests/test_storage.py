@@ -6,11 +6,11 @@ from dataclasses import replace
 import numpy as np
 import pytest
 
-from dropwatch import ApolloLifecycleError
-from dropwatch import ApolloSettings
-from dropwatch import DropwatchApollo
-from dropwatch._capture import _SequenceCapture
-from dropwatch._storage import save_npy
+from dropwatch_apollo import ApolloLifecycleError
+from dropwatch_apollo import ApolloSettings
+from dropwatch_apollo import DropwatchApollo
+from dropwatch_apollo._capture import _SequenceCapture
+from dropwatch_apollo._storage import save_npy
 from tests._support import FakeFrameSource
 from tests._support import frame
 from tests._support import frame_ids
@@ -33,7 +33,7 @@ def test_forty_shots_use_three_recycled_blocks_and_survive_close(tmp_path, monke
     with DropwatchApollo(config, frame_source=source) as apollo:
         source.feed([frame(1), frame(2), frame(3)])
         with monkeypatch.context() as m:
-            m.setattr("dropwatch._capture.np.full", allocate)
+            m.setattr("dropwatch_apollo._capture.np.full", allocate)
             apollo.start(max_sequences=40)
         sequences = []
         for shot in range(40):
@@ -61,7 +61,7 @@ def test_production_40_by_1000_memory_plan_is_bounded(tmp_path, monkeypatch):
     config = ApolloSettings(max_number_frames=1000, pre_trigger=20, spool_directory=tmp_path)
     capture = _SequenceCapture(config)
     capture.reset(max_sequences=40)
-    monkeypatch.setattr("dropwatch._capture.np.full", allocate)
+    monkeypatch.setattr("dropwatch_apollo._capture.np.full", allocate)
     camera_bytes = 100 * 512 * 2240 + 1228800
     capture.prepare((512, 1120), np.uint8, additional_buffer_bytes=camera_bytes)
     assert shapes == [(1020, 512, 1120)] * 3
@@ -77,7 +77,7 @@ def test_slow_writer_fails_explicitly_and_keeps_complete_shots(tmp_path, monkeyp
         assert release.wait(3)
         return actual_save(*args)
 
-    monkeypatch.setattr("dropwatch._storage.save_npy", slow_save)
+    monkeypatch.setattr("dropwatch_apollo._storage.save_npy", slow_save)
     source = FakeFrameSource()
     apollo = DropwatchApollo(replace(settings(), spool_directory=tmp_path), frame_source=source)
     source.feed([frame(1), frame(2), frame(3)])
@@ -106,7 +106,7 @@ def test_disk_failure_preserves_the_validated_memory_sequence(tmp_path, monkeypa
     def broken_save(*_args):
         raise OSError("disk disconnected")
 
-    monkeypatch.setattr("dropwatch._storage.save_npy", broken_save)
+    monkeypatch.setattr("dropwatch_apollo._storage.save_npy", broken_save)
     source = FakeFrameSource()
     apollo = DropwatchApollo(replace(settings(), spool_directory=tmp_path), frame_source=source)
     source.feed([frame(1), frame(2), frame(3)])

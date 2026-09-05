@@ -1,4 +1,4 @@
-"""Small recorder CLI: python -m dropwatch --help (or dwa --help)."""
+"""Small recorder CLI: python -m dropwatch_apollo --help (or dwa --help)."""
 
 from __future__ import annotations
 
@@ -7,22 +7,22 @@ import logging
 import sys
 from pathlib import Path
 
-from dropwatch import ApolloSettings
-from dropwatch import ApolloVideoSettings
-from dropwatch import DropwatchApollo
-from dropwatch import ReplayFrameSource
+from dropwatch_apollo import ApolloSettings
+from dropwatch_apollo import ApolloVideoSettings
+from dropwatch_apollo import DropwatchApollo
+from dropwatch_apollo import ReplayFrameSource
 
 
 def main() -> None:
     if len(sys.argv) > 1 and sys.argv[1] == "diagnose":
-        from dropwatch.diagnostics import main as diagnose
+        from dropwatch_apollo.diagnostics import main as diagnose
 
         diagnose(sys.argv[2:])
         return
-    parser = argparse.ArgumentParser(description="Single-view Apollo recording and replay")
+    parser = argparse.ArgumentParser(description="Single-view Dropwatch Apollo recording and replay")
     parser.add_argument("command", choices=("record", "snapshot", "preview", "replay", "diagnose"))
     parser.add_argument("files", nargs="*", type=Path, help="RLE BIN or raw NPY files for replay")
-    parser.add_argument("--output", type=Path, default=Path("apollo_recordings"))
+    parser.add_argument("--output", type=Path, default=Path("dropwatch_recordings"))
     parser.add_argument("--frames", type=int, default=200, help="total frames per shot, including lookback")
     parser.add_argument("--pre-trigger", type=int, default=20)
     parser.add_argument("--shots", type=int, default=1, help="maximum number of shots")

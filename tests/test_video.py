@@ -5,9 +5,9 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from dropwatch import ApolloLifecycleError
-from dropwatch import ApolloVideoSettings
-from dropwatch import DropwatchApollo
+from dropwatch_apollo import ApolloLifecycleError
+from dropwatch_apollo import ApolloVideoSettings
+from dropwatch_apollo import DropwatchApollo
 
 from ._support import FakeFrameSource
 from ._support import FakeVideoWriter
@@ -19,7 +19,7 @@ from ._support import settings
 def mocked_video_verification(monkeypatch):
     # These tests exercise writer orchestration. Real codecs/readback are
     # covered separately in test_regressions.py, without these patches.
-    monkeypatch.setattr("dropwatch._video._verify_video", lambda *_args: None)
+    monkeypatch.setattr("dropwatch_apollo._video._verify_video", lambda *_args: None)
 
 
 def _sequence(offset: int = 0) -> np.ndarray:

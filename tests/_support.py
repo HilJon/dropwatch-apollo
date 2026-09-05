@@ -6,7 +6,7 @@ from pathlib import Path
 
 import numpy as np
 
-from dropwatch import ApolloSettings
+from dropwatch_apollo import ApolloSettings
 
 
 class FakeFrameSource:

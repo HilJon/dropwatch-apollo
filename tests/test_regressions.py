@@ -16,14 +16,14 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from dropwatch import ApolloVideoSettings
-from dropwatch import DropwatchApollo
-from dropwatch import ReplayFrameSource
-from dropwatch._capture import _CapturedSequence
-from dropwatch._capture import _SequenceCapture
-from dropwatch._evaluation import _EvaluationRunner
-from dropwatch._hardware import RLEDecoder
-from dropwatch.replay import _rle_frames
+from dropwatch_apollo import ApolloVideoSettings
+from dropwatch_apollo import DropwatchApollo
+from dropwatch_apollo import ReplayFrameSource
+from dropwatch_apollo._capture import _CapturedSequence
+from dropwatch_apollo._capture import _SequenceCapture
+from dropwatch_apollo._evaluation import _EvaluationRunner
+from dropwatch_apollo._hardware import RLEDecoder
+from dropwatch_apollo.replay import _rle_frames
 from tests._support import FakeFrameSource
 from tests._support import frame
 from tests._support import frame_ids
@@ -248,7 +248,7 @@ def test_export_guard_also_prevents_start_during_export(tmp_path, monkeypatch):
             apollo.start()
         return args[1]
 
-    monkeypatch.setattr("dropwatch.apollo._save_video", encode)
+    monkeypatch.setattr("dropwatch_apollo.apollo._save_video", encode)
     apollo.save_video(np.ones((20, 4, 8), dtype=np.uint8), tmp_path / "video.avi")
     assert not apollo._exporting
 

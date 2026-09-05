@@ -1,4 +1,4 @@
-"""Atomic, post-acquisition video export for Apollo's left camera view."""
+"""Atomic, post-acquisition video export for Dropwatch Apollo's left camera view."""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ from uuid import uuid4
 
 import numpy as np
 
-from dropwatch.models import ApolloVideoSettings
+from dropwatch_apollo.models import ApolloVideoSettings
 
 
 def save_png(frame: np.ndarray, path: str | Path) -> Path:
@@ -65,6 +65,11 @@ def save_video(
         )
     if output_width % 2 or output_height % 2:
         raise ValueError("video dimensions must be even; choose an even crop_bottom to avoid codec truncation")
+    if options.legacy_layout:
+        # Keep the exact legacy header; pad at the bottom instead of silently
+        # letting the codec truncate the final measurement row (odd header).
+        header_height = legacy_header_height()
+        output_height += header_height + header_height % 2
     frame_size = (output_width, output_height)
     codec = options.codec or ("MJPG" if suffix == ".avi" else "mp4v")
 
@@ -76,14 +81,17 @@ def save_video(
             cv2.VideoWriter_fourcc(*codec),  # type: ignore[attr-defined]
             options.playback_fps,
             frame_size,
-            False,
+            options.legacy_layout,
         )
         try:
             if not writer.isOpened():
                 raise OSError(f"could not open {codec} video writer for {output_path}")
 
-            background = 0 if options.invert else 255
-            separator = np.full((output_height, output_width), background, dtype=np.uint8)
+            background = 0 if options.invert or options.legacy_layout else 255
+            separator_shape = (
+                (output_height, output_width, 3) if options.legacy_layout else (output_height, output_width)
+            )
+            separator = np.full(separator_shape, background, dtype=np.uint8)
             for shot_index, sequence in enumerate(shots):
                 shot = shot_offset + shot_index
                 stop = len(sequence) if options.trim_end is None else min(options.trim_end, len(sequence))
@@ -98,7 +106,7 @@ def save_video(
                         cv2=cv2,
                     )
                     writer.write(image)
-                if shot_index + 1 < len(shots):
+                if shot_index + 1 < len(shots) or options.legacy_layout:
                     for _ in range(options.separator_frames):
                         writer.write(separator)
         finally:
@@ -111,7 +119,7 @@ def save_video(
                 (len(shot) if options.trim_end is None else min(options.trim_end, len(shot))) - options.trim_start
                 for shot in shots
             )
-            + (len(shots) - 1) * options.separator_frames
+            + (len(shots) if options.legacy_layout else len(shots) - 1) * options.separator_frames
         )
         _verify_video(temporary_path, expected_frames, frame_size)
         os.replace(temporary_path, output_path)
@@ -222,6 +230,14 @@ def _render_frame(
     if options.crop_bottom:
         image = image[: -options.crop_bottom]
     image = np.ascontiguousarray(image)
+    if options.legacy_layout:
+        header = np.zeros((legacy_header_height(), image.shape[1]), dtype=np.uint8)
+        padding = np.zeros((len(header) % 2, image.shape[1]), dtype=np.uint8)
+        image = cv2.cvtColor(np.vstack((header, image, padding)), cv2.COLOR_GRAY2BGR)  # type: ignore[attr-defined]
+        index = frame_index - options.trim_start
+        label = f"{(index + 1) * frame_period_ms:.2f}ms     frame {index}    sequence {shot}"
+        cv2.putText(image, label, (1, 16), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 165, 0), 2)  # type: ignore[attr-defined]
+        return image
     if options.annotate:
         time_ms = (frame_index - pre_trigger) * frame_period_ms
         label = f"shot {shot}  frame {frame_index}  t={time_ms:+.3f} ms"
@@ -236,3 +252,10 @@ def _render_frame(
             cv2.LINE_AA,  # type: ignore[attr-defined]
         )
     return image
+
+
+def legacy_header_height() -> int:
+    """Match the recorder label band without overwriting measurement pixels."""
+    import cv2
+
+    return int(cv2.getTextSize("1123456789ms", cv2.FONT_HERSHEY_SIMPLEX, 0.7, 2)[0][1]) + 4

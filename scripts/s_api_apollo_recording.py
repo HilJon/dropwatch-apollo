@@ -4,9 +4,9 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from dropwatch import ApolloSettings
-from dropwatch import ApolloVideoSettings
-from dropwatch import DropwatchApollo
+from dropwatch_apollo import ApolloSettings
+from dropwatch_apollo import ApolloVideoSettings
+from dropwatch_apollo import DropwatchApollo
 
 logger = logging.getLogger(__name__)
 
@@ -26,11 +26,21 @@ def evaluate_sequences(sequences: list[np.ndarray]) -> pd.DataFrame:
     )
 
 
+def finalize_evaluations(observations: pd.DataFrame) -> pd.DataFrame:
+    """Called once with global shot IDs; placeholder leaves the table unchanged.
+
+    For the existing A1 tracker, use make_evaluation_callbacks() from
+    dropwatch_apollo.integration: connect_shots/postproc belong here, not in
+    the per-window worker. See MIGRATION.md.
+    """
+    return observations
+
+
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
-    output_dir = Path("apollo_recordings")
+    output_dir = Path("dropwatch_recordings")
 
-    apollo_settings = ApolloSettings(
+    settings = ApolloSettings(
         max_number_frames=50,
         pre_trigger=10,
         frame_period_ms=1.0,  # 1000 fps
@@ -39,10 +49,14 @@ if __name__ == "__main__":
         # Optional: bounded RAM + durable NPY shots, suitable for e.g. 40 x
         # 1000 frames. Use a fast local SSD and qualify it at the target rate.
         spool_directory=output_dir / "raw",
+        spool_chunk_frames=100,
+        spool_buffer_count=8,
     )
 
     number_sequences = 2
-    with DropwatchApollo(apollo_settings, evaluator=evaluate_sequences) as dropwatch:
+    with DropwatchApollo(
+        settings, evaluator=evaluate_sequences, evaluation_finalizer=finalize_evaluations
+    ) as dropwatch:
         trigger_position_px = dropwatch.set_trigger_size(width=100)
         logger.info("Plate detected; trigger position is %d px from the bottom", trigger_position_px)
 

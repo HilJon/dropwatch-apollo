@@ -3,15 +3,19 @@
 ## Requirements
 
 - Windows acquisition PC
-- FastEye Apollo camera
+- FastEye RLE camera
 - Cypress USB camera driver
 - Python 3.10 or newer
 
 The vendor DLLs and their configuration bundle are included under
-`dropwatch/data/core`. The built wheel is tagged `win_amd64`; a 64-bit Python
+`dropwatch_apollo/data/core`. The built wheel is tagged `win_amd64`; a 64-bit Python
 installation is required.
 
 ## Install
+
+For an existing recorder environment, follow [MIGRATION.md](MIGRATION.md) first.
+Uninstall `dropwatch-recorder` **before** installing this version: both provide
+the `recorder` import namespace. Do not install them together.
 
 ```powershell
 py -m venv .venv
@@ -30,10 +34,10 @@ For development:
 
 ```powershell
 pip install -e . --group dev
-python -m pytest --cov=dropwatch --cov-fail-under=80
+python -m pytest --cov=dropwatch_apollo --cov-fail-under=80
 python -m ruff check .
 python -m ruff format --check .
-python -m mypy dropwatch
+python -m mypy dropwatch_apollo recorder
 ```
 
 No camera is needed for the software tests. Two real-decoder tests require
@@ -41,14 +45,14 @@ Windows and run against the bundled DLL; they are skipped on macOS/Linux.
 Source-based development and pure-Python RLE replay work on those platforms,
 but the distributable vendor-DLL wheel intentionally targets Windows x64.
 
-The CLI is `dwa --help` or `python -m dropwatch --help`. For example:
+The CLI is `dwa --help` or `python -m dropwatch_apollo --help`. For example:
 
 ```powershell
 dwa record --frames 1000 --pre-trigger 20 --shots 40 --duration 60 --auto-trigger
 ```
 
 The CLI saves lossless NPY shots to a unique directory under
-`apollo_recordings/raw`, then exports AVI files. Use a fast local SSD for large
+`dropwatch_recordings/raw`, then exports AVI files. Use a fast local SSD for large
 recordings. A connected camera is required for `HARDWARE_ACCEPTANCE.md`.
 
 For isolated camera/USB diagnostics, run `dwa diagnose --help` and follow

@@ -14,8 +14,8 @@ from typing import Any
 
 import numpy as np
 
-from dropwatch.models import ApolloLifecycleError
-from dropwatch.models import ApolloSettings
+from dropwatch_apollo.models import ApolloLifecycleError
+from dropwatch_apollo.models import ApolloSettings
 
 
 @dataclass(eq=False)
@@ -79,6 +79,7 @@ class _SequenceCapture:
             self._max_sequences = max_sequences
         self._sequence_pool: queue.Queue[np.ndarray] = queue.Queue()
         self._sequence_index = 0
+        self.trigger_count = 0
         self._lease: _FrameLease | None = None
         self._sequence: np.ndarray | None = None
         self._pre_trigger_buffer: np.ndarray | None = None
@@ -99,11 +100,10 @@ class _SequenceCapture:
         additional_buffer_bytes: int = 0,
     ) -> None:
         if len(frame_shape) != 2 or any(d < 1 for d in frame_shape):
-            raise ValueError(f"Apollo expects a positive 2D frame shape, got {frame_shape}")
+            raise ValueError(f"Dropwatch Apollo expects a positive 2D frame shape, got {frame_shape}")
         if additional_buffer_bytes < 0:
             raise ValueError("additional_buffer_bytes must be >= 0")
-        if self._settings.trigger_position_px + self._settings.trigger_width_px > frame_shape[1]:
-            raise ValueError("trigger ROI extends outside the image width")
+        _validate_roi(self._settings, frame_shape)
         dtype = np.dtype(frame_dtype)
         self._frame_shape, self._frame_dtype = frame_shape, dtype
         count = self._max_sequences
@@ -120,7 +120,7 @@ class _SequenceCapture:
         required = sequence_bytes + additional_buffer_bytes
         if required > self._settings.max_buffer_bytes:
             raise MemoryError(
-                f"Apollo needs {required} bytes of acquisition buffers ({sequence_bytes} sequence, "
+                f"Dropwatch Apollo needs {required} bytes of acquisition buffers ({sequence_bytes} sequence, "
                 f"{additional_buffer_bytes} camera), exceeding max_buffer_bytes={self._settings.max_buffer_bytes}"
             )
         for _ in range(count):
@@ -156,6 +156,7 @@ class _SequenceCapture:
         assert self._sequence is not None and self._lease is not None
         pixels = self._foreground_pixels(frame)
         if not self.is_capturing and self._armed and pixels > self._settings.trigger_on_pixels:
+            self.trigger_count += 1
             self._trigger_history = tuple(self._history)
             self._sequence_pos = self._settings.pre_trigger
             return self._record_frame(frame, pixels)
@@ -171,6 +172,8 @@ class _SequenceCapture:
         return None
 
     def _update_arm(self, pixels: int) -> None:
+        if self._settings.trigger_policy == "level" and self._armed:
+            return
         if pixels <= self._settings.trigger_off_pixels:
             self._clear_frames += 1
             if (
@@ -204,11 +207,28 @@ class _SequenceCapture:
         return result
 
     def _foreground_pixels(self, frame: np.ndarray) -> int:
-        start = self._settings.trigger_position_px
-        if not self._settings.trigger_from_top:
-            start = frame.shape[1] - start - self._settings.trigger_width_px
-        roi = frame[:, start : start + self._settings.trigger_width_px]
-        return int(roi.size - np.count_nonzero(roi))
+        return _foreground_pixels(self._settings, frame)
+
+
+def _validate_roi(settings: ApolloSettings, frame_shape: tuple[int, int]) -> None:
+    roi = settings.trigger_roi
+    if roi is not None:
+        if roi.x1 > frame_shape[0] or roi.y1 > frame_shape[1]:
+            raise ValueError("trigger ROI extends outside the left image")
+    elif settings.trigger_position_px + settings.trigger_width_px > frame_shape[1]:
+        raise ValueError("trigger ROI extends outside the image width")
+
+
+def _foreground_pixels(settings: ApolloSettings, frame: np.ndarray) -> int:
+    bounds = settings.trigger_roi
+    if bounds is not None:
+        roi = frame[bounds.x0 : bounds.x1, bounds.y0 : bounds.y1]
+    else:
+        start = settings.trigger_position_px
+        if not settings.trigger_from_top:
+            start = frame.shape[1] - start - settings.trigger_width_px
+        roi = frame[:, start : start + settings.trigger_width_px]
+    return int(roi.size - np.count_nonzero(roi))
 
 
 def _find_bottom_object_position(frame: np.ndarray) -> int:
@@ -216,7 +236,7 @@ def _find_bottom_object_position(frame: np.ndarray) -> int:
     import cv2
 
     if frame.ndim != 2:
-        raise ValueError(f"Apollo expects a single 2D image, got shape {frame.shape}")
+        raise ValueError(f"Dropwatch Apollo expects a single 2D image, got shape {frame.shape}")
     _, labels, stats, _ = cv2.connectedComponentsWithStats((frame == 0).astype(np.uint8), connectivity=4)
     edge_labels = np.unique(labels[:, -1])
     edge_labels = edge_labels[edge_labels != 0]

@@ -10,7 +10,7 @@ Install version **0.2.3 or later** for reduced polling and query timing. Version
 0.2.2 fixed the startup-order bug in 0.2.1 but still read four status registers
 before every buffer. From the updated source
 folder: `python -m pip install --upgrade .`. Verify the installed version with
-`python -c "import dropwatch; print(dropwatch.__version__)"`.
+`python -c "import dropwatch_apollo; print(dropwatch_apollo.__version__)"`.
 Close other programs holding the camera, including another Dropwatch process.
 Use the normal illumination, threshold and exposure. Keep the plate in view.
 
@@ -147,7 +147,7 @@ the same frame rate and a different timeout:
 dwa diagnose --mode transport --fps 2000 --duration 600 --read-timeout-ms 2000 --label "timeout comparison"
 ```
 
-Defaults match Apollo: 100 frames per RLE flush, 500 ms read timeout at 1–2 kfps,
+Defaults match Dropwatch Apollo: 100 frames per RLE flush, 500 ms read timeout at 1–2 kfps,
 threshold 127 and exposure 0.05 ms. Options `--threshold`, `--exposure-time-ms`
 and `--rle-batch-frames` allow matching the production setup. Unsafe batch sizes
 are rejected before opening hardware. `--idle-timeout` defaults to 5 seconds

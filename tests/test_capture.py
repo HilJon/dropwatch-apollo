@@ -5,10 +5,10 @@ from dataclasses import replace
 import numpy as np
 import pytest
 
-from dropwatch import ApolloLifecycleError
-from dropwatch import ApolloSettings
-from dropwatch import DropwatchApollo
-from dropwatch._capture import _SequenceCapture
+from dropwatch_apollo import ApolloLifecycleError
+from dropwatch_apollo import ApolloSettings
+from dropwatch_apollo import DropwatchApollo
+from dropwatch_apollo._capture import _SequenceCapture
 
 from ._support import FakeFrameSource
 from ._support import expected_sequence_ids
@@ -96,7 +96,7 @@ def test_set_trigger_size_rejects_running_acquisition():
         apollo.start()
         with pytest.raises(
             ApolloLifecycleError,
-            match="while Apollo acquisition is running",
+            match="while Dropwatch Apollo acquisition is running",
         ):
             apollo.set_trigger_size()
         apollo.stop()

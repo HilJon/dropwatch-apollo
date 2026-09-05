@@ -1,14 +1,19 @@
-# Dropwatch Apollo
+# dropwatch-apollo
 
 A small, single-view FastEye RLE recorder. No calibration, split-view processing,
 tip detector, or dropeval dependency. Camera frames arrive on the PC continuously;
 triggering and recording happen there. Hardware acquisition requires Windows x64.
 Tests and reference-file replay also run without hardware.
 
+The product is **dropwatch-apollo**; its Python namespace is `dropwatch_apollo`.
+Apollo alone names the dispenser, not the camera or this library.
+For existing `recorder.*` scripts, see [MIGRATION.md](MIGRATION.md): version 0.3
+includes a small compatibility facade, not a second capture engine.
+
 ## Recording
 
 ```python
-from dropwatch import ApolloSettings, DropwatchApollo
+from dropwatch_apollo import ApolloSettings, DropwatchApollo
 
 settings = ApolloSettings(
     max_number_frames=200,  # TOTAL length, including pre-trigger
@@ -33,7 +38,7 @@ is at index `pre_trigger`. Arrays keep their raw orientation; videos/PNGs are
 transposed into physical orientation. A PC-side crop does **not** reduce the
 FPGA/USB transfer or the full vendor decode.
 
-Apollo defaults to `trigger_from_top=False`, no tip detector (equivalent to
+Dropwatch Apollo defaults to `trigger_from_top=False`, no tip detector (equivalent to
 `IgnoreTipDetector`), and no debug plots or split-view trigger.
 `set_trigger_size()` finds the highest foreground connected to the physical
 bottom edge and puts a band immediately above it. Inspect the snapshot: noise
@@ -56,7 +61,7 @@ connected to an edge can affect this placement.
   queued droplets and partially flushed FPGA data, and may include droplets
   arriving just after the request. At defaults, the flush grace is about 101 ms.
   This boundary must be qualified on the real camera.
-- A drain timeout raises `ApolloIncompleteSequenceError`, even if Apollo could
+- A drain timeout raises `ApolloIncompleteSequenceError`, even if Dropwatch Apollo could
   not prove the queue empty and no shot was active. Its `completed_sequences`
   contains the finished shots.
 - `abort()` intentionally discards unread/in-progress data. It still waits for
@@ -108,16 +113,24 @@ and camera buffers total about **1.75 GiB**, below the default
 impossible configurations are rejected before recording. Three 2000-frame blocks
 need a larger memory budget, e.g. 4 GiB.
 
-The memory budget covers Apollo's explicit acquisition buffers, **not** OS file
+The memory budget covers Dropwatch Apollo's explicit acquisition buffers, **not** OS file
 cache, mapped pages accessed by consumers, or arbitrary evaluator allocations.
 Release your own arrays/DataFrames when finished. No library can release memory
 still referenced by application code.
 
 Use a fast local SSD with enough free disk space. The queue and buffer count
-are bounded: if writing cannot keep up, Apollo raises an error rather than
+are bounded: if writing cannot keep up, Dropwatch Apollo raises an error rather than
 blocking camera intake or silently overwriting a shot. Existing completed shots
 remain recoverable. Disk spooling, evaluation, and camera throughput must be
 benchmarked together at 1000/2000 fps.
+
+For windows longer than 2000 frames, or a smaller fixed memory footprint, set
+`spool_chunk_frames=100` together with `spool_directory`. This mode allocates
+`spool_buffer_count` chunks plus the pre-trigger ring, independent of window
+length. Chunks are written in order and only a complete, fsynced NPY is published.
+Unfinished files are removed on failure; completed windows remain. A session
+quota (`max_spool_bytes`, default 64 GiB) and per-window free-space checks fail
+explicitly. This is the default storage mode of the `recorder.*` facade.
 
 ## Failure handling
 
@@ -204,6 +217,12 @@ Evaluation is opt-in: a Python-heavy callback can contend for the GIL, CPU,
 memory bandwidth, and file cache. Leave it disabled until the production
 function has been tested on the acquisition PC.
 
+If tracking joins droplets across windows, supply `evaluation_finalizer=...`.
+It receives the concatenated raw-observation DataFrame with global shot IDs
+once, after per-sequence evaluation. Do not independently postprocess each
+window before joining tracks. The optional A1 bridge in `MIGRATION.md` implements
+this separation using the existing external `fast_seq_eval` functions.
+
 ## Export, preview, and replay
 
 `save_video(sequences, "all.avi", options=...)` combines shots;
@@ -225,7 +244,7 @@ lossy: use NPY or PNG for pixel-exact data.
 - `save_frames(sequences, directory)`: physical-orientation PNG per frame.
 
 ```python
-from dropwatch import ReplayFrameSource
+from dropwatch_apollo import ReplayFrameSource
 
 source = ReplayFrameSource(["recording.bin"], batch_frames=100)
 with DropwatchApollo(settings, frame_source=source) as dw:
@@ -241,7 +260,7 @@ window is an error. Already-triggered NPY shots can instead be exported directly
 without re-triggering. Replay is fast by default; `frame_period_ms` optionally
 paces it. It is a diagnostic tool, not the live high-speed backend.
 
-CLI (also available as `python -m dropwatch`):
+CLI (also available as `python -m dropwatch_apollo`):
 
 ```shell
 dwa snapshot --output inspection
@@ -257,10 +276,10 @@ after capture. See `scripts/s_api_apollo_recording.py` for evaluation integratio
 
 ```shell
 pip install -e . --group dev
-python -m pytest --cov=dropwatch --cov-fail-under=80
+python -m pytest --cov=dropwatch_apollo --cov-fail-under=80
 python -m ruff check .
 python -m ruff format --check .
-python -m mypy dropwatch
+python -m mypy dropwatch_apollo recorder
 python -m build --wheel
 ```
 

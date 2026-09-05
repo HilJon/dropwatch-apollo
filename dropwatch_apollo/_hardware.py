@@ -1,4 +1,4 @@
-"""Minimal Windows FastEye RLE hardware adapter used by Apollo."""
+"""Minimal Windows FastEye RLE hardware adapter used by Dropwatch Apollo."""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ from typing import Any
 
 import numpy as np
 
-from dropwatch.models import ApolloFrameLossError
+from dropwatch_apollo.models import ApolloFrameLossError
 
 PACKAGE_ROOT = Path(__file__).parent
 CORE_PATH = PACKAGE_ROOT / "data" / "core"
@@ -111,7 +111,7 @@ class _DAQ:
 
 
 class FastEyeRLE:
-    """Only the FastEye operations required by the Apollo RLE stream."""
+    """Only the FastEye operations required by the Dropwatch Apollo RLE stream."""
 
     def __init__(self) -> None:
         self._daq = _DAQ()

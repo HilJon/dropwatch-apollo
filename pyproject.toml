@@ -1,6 +1,6 @@
 [project]
 name = "dropwatch-apollo"
-version = "0.2.3"
+version = "0.3.0"
 description = "Minimal single-view FastEye RLE drop recorder"
 authors = [
   { name = "Adrian Rohner", email = "arohner@hamilton.ch" },
@@ -15,7 +15,7 @@ dependencies = [
 ]
 
 [project.scripts]
-dwa = "dropwatch.__main__:main"
+dwa = "dropwatch_apollo.__main__:main"
 
 [project.optional-dependencies]
 evaluation = [
@@ -40,7 +40,7 @@ requires = ["hatchling>=1.27,<2"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["dropwatch"]
+packages = ["dropwatch_apollo", "recorder"]
 
 [tool.hatch.build.targets.wheel.hooks.custom]
 
@@ -54,7 +54,7 @@ ignore = ["E501"]
 
 [tool.ruff.lint.isort]
 force-single-line = true
-known-first-party = ["dropwatch"]
+known-first-party = ["dropwatch_apollo"]
 
 [tool.ruff.lint.per-file-ignores]
 "scripts/*" = ["T201"]

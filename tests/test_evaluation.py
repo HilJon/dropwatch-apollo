@@ -6,9 +6,9 @@ import time
 import pandas as pd
 import pytest
 
-from dropwatch import ApolloEvaluationError
-from dropwatch import ApolloLifecycleError
-from dropwatch import DropwatchApollo
+from dropwatch_apollo import ApolloEvaluationError
+from dropwatch_apollo import ApolloLifecycleError
+from dropwatch_apollo import DropwatchApollo
 
 from ._support import FakeFrameSource
 from ._support import evaluation_threads

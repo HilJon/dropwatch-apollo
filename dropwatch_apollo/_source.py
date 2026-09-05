@@ -1,4 +1,4 @@
-"""FastEye RLE source adapted to Apollo's single-view frame contract."""
+"""FastEye RLE source adapted to Dropwatch Apollo's single-view frame contract."""
 
 from __future__ import annotations
 
@@ -11,13 +11,13 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
-from dropwatch.models import ApolloSettings
-from dropwatch.models import ApolloTransportError
+from dropwatch_apollo.models import ApolloSettings
+from dropwatch_apollo.models import ApolloTransportError
 
 if TYPE_CHECKING:
-    from dropwatch._hardware import FastEyeRLE
-    from dropwatch._hardware import RLEDecoder
-    from dropwatch._hardware import RLEReadGate
+    from dropwatch_apollo._hardware import FastEyeRLE
+    from dropwatch_apollo._hardware import RLEDecoder
+    from dropwatch_apollo._hardware import RLEReadGate
 
 logger = logging.getLogger(__name__)
 
@@ -52,8 +52,8 @@ class _FastEyeApolloSource:
 
     @property
     def frame_shape(self) -> tuple[int, int]:
-        from dropwatch._hardware import LEFT_VIEW_WIDTH
-        from dropwatch._hardware import RAW_FRAME_HEIGHT
+        from dropwatch_apollo._hardware import LEFT_VIEW_WIDTH
+        from dropwatch_apollo._hardware import RAW_FRAME_HEIGHT
 
         return RAW_FRAME_HEIGHT, LEFT_VIEW_WIDTH
 
@@ -63,9 +63,9 @@ class _FastEyeApolloSource:
 
     @property
     def reserved_buffer_bytes(self) -> int:
-        from dropwatch._hardware import ENCODED_BUFFER_BYTES
-        from dropwatch._hardware import RAW_FRAME_HEIGHT
-        from dropwatch._hardware import RAW_FRAME_WIDTH
+        from dropwatch_apollo._hardware import ENCODED_BUFFER_BYTES
+        from dropwatch_apollo._hardware import RAW_FRAME_HEIGHT
+        from dropwatch_apollo._hardware import RAW_FRAME_WIDTH
 
         decoded = self._settings.rle_batch_frames * RAW_FRAME_HEIGHT * RAW_FRAME_WIDTH
         encoded = ENCODED_BUFFER_BYTES
@@ -80,7 +80,7 @@ class _FastEyeApolloSource:
         if self._camera is not None:
             return
 
-        from dropwatch._hardware import FastEyeRLE
+        from dropwatch_apollo._hardware import FastEyeRLE
 
         camera = FastEyeRLE()
         try:
@@ -104,10 +104,10 @@ class _FastEyeApolloSource:
         if self._camera is None:
             raise RuntimeError("camera could not be opened")
 
-        from dropwatch._hardware import RAW_FRAME_HEIGHT
-        from dropwatch._hardware import RAW_FRAME_WIDTH
-        from dropwatch._hardware import RLEDecoder
-        from dropwatch._hardware import RLEReadGate
+        from dropwatch_apollo._hardware import RAW_FRAME_HEIGHT
+        from dropwatch_apollo._hardware import RAW_FRAME_WIDTH
+        from dropwatch_apollo._hardware import RLEDecoder
+        from dropwatch_apollo._hardware import RLEReadGate
 
         camera = self._camera
         try:
@@ -156,8 +156,8 @@ class _FastEyeApolloSource:
             raise
 
     def _read_started(self) -> np.ndarray | None:
-        from dropwatch._hardware import DAQError
-        from dropwatch._hardware import validate_rle_batch
+        from dropwatch_apollo._hardware import DAQError
+        from dropwatch_apollo._hardware import validate_rle_batch
 
         if self._camera is None or self._decoder is None or self._read_gate is None:
             raise RuntimeError("camera source is not available")
@@ -188,13 +188,13 @@ class _FastEyeApolloSource:
         if recovered:
             self._update_stats(recovered_zero_byte_reads=1)
 
-        from dropwatch._hardware import LEFT_VIEW_WIDTH
+        from dropwatch_apollo._hardware import LEFT_VIEW_WIDTH
 
         return self._decode_buffer[:frames, :, :LEFT_VIEW_WIDTH]
 
     def _read_image_with_retry(self, camera: FastEyeRLE) -> bool:
-        from dropwatch._hardware import DAQError
-        from dropwatch._hardware import DAQReadError
+        from dropwatch_apollo._hardware import DAQError
+        from dropwatch_apollo._hardware import DAQReadError
 
         saw_zero_byte_read = False
         total_attempts = self._settings.zero_byte_read_retries + 1

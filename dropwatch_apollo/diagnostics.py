@@ -19,20 +19,20 @@ from uuid import uuid4
 
 import numpy as np
 
-from dropwatch import __version__
-from dropwatch._hardware import CORE_PATH
-from dropwatch._hardware import ENCODED_BUFFER_BYTES
-from dropwatch._hardware import MAX_BYTES_PER_IMAGE
-from dropwatch._hardware import RAW_FRAME_HEIGHT
-from dropwatch._hardware import RAW_FRAME_WIDTH
-from dropwatch._hardware import DAQReadError
-from dropwatch._hardware import FastEyeRLE
-from dropwatch._hardware import RLEDecoder
-from dropwatch._hardware import RLEReadGate
-from dropwatch._hardware import validate_rle_batch
-from dropwatch.models import ApolloSettings
-from dropwatch.models import require_finite
-from dropwatch.models import require_integer
+from dropwatch_apollo import __version__
+from dropwatch_apollo._hardware import CORE_PATH
+from dropwatch_apollo._hardware import ENCODED_BUFFER_BYTES
+from dropwatch_apollo._hardware import MAX_BYTES_PER_IMAGE
+from dropwatch_apollo._hardware import RAW_FRAME_HEIGHT
+from dropwatch_apollo._hardware import RAW_FRAME_WIDTH
+from dropwatch_apollo._hardware import DAQReadError
+from dropwatch_apollo._hardware import FastEyeRLE
+from dropwatch_apollo._hardware import RLEDecoder
+from dropwatch_apollo._hardware import RLEReadGate
+from dropwatch_apollo._hardware import validate_rle_batch
+from dropwatch_apollo.models import ApolloSettings
+from dropwatch_apollo.models import require_finite
+from dropwatch_apollo.models import require_integer
 
 
 def _error(error: BaseException) -> dict[str, Any]:
@@ -355,7 +355,7 @@ def main(argv: list[str]) -> None:
     parser.add_argument("--fps", type=float, default=1000)
     parser.add_argument("--duration", type=float, default=600, help="acquisition duration in seconds")
     parser.add_argument("--output", type=Path, default=Path("apollo_diagnostics"))
-    parser.add_argument("--read-timeout-ms", type=int, help="default: Apollo's batch-aware timeout")
+    parser.add_argument("--read-timeout-ms", type=int, help="default: Dropwatch Apollo's batch-aware timeout")
     parser.add_argument("--rle-batch-frames", type=int, default=100)
     parser.add_argument("--threshold", type=int, default=127)
     parser.add_argument("--exposure-time-ms", type=float, default=0.05)

@@ -1,0 +1,15 @@
+diff --git a/src/a1_dispense_executor/run_dispense.py b/src/a1_dispense_executor/run_dispense.py
+--- a/src/a1_dispense_executor/run_dispense.py
++++ b/src/a1_dispense_executor/run_dispense.py
+@@ -33,8 +33,9 @@
+     run_low_level_dispense,
+     run_low_level_survey,
+ )
+-from a1_experiment_lib.dropwatch_helper import _crop_sequences, _evaluate_sequences
+-from dropeval.utils.io import extract_video
++from dropwatch_apollo.integration import crop_sequences as _crop_sequences
++from dropwatch_apollo.integration import evaluate_sequences as _evaluate_sequences
++from dropwatch_apollo.integration import extract_video
+ from fasteye import FastEyeReadError
+ from recorder.api.dropwatch import Dropwatch
+ from recorder.core.capture import CaptureState

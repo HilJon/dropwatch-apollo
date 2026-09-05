@@ -1,4 +1,4 @@
-"""Public configuration, protocols, errors, and statistics for Apollo."""
+"""Public configuration, protocols, errors, and statistics for Dropwatch Apollo."""
 
 from __future__ import annotations
 
@@ -7,9 +7,26 @@ from math import ceil
 from math import isfinite
 from pathlib import Path
 from typing import Any
+from typing import Literal
 from typing import Protocol
 
 import numpy as np
+
+
+@dataclass(frozen=True)
+class DisplayRoi2D:
+    """Exclusive bounds in the physical left image (y is its long axis)."""
+
+    y0: int
+    y1: int
+    x0: int
+    x1: int
+
+    def __post_init__(self) -> None:
+        for name in ("y0", "y1", "x0", "x1"):
+            require_integer(name, getattr(self, name))
+        if not (0 <= self.y0 < self.y1 and 0 <= self.x0 < self.x1):
+            raise ValueError("ROI must have non-negative, increasing bounds")
 
 
 @dataclass(frozen=True)
@@ -34,6 +51,10 @@ class ApolloSettings:
     max_buffer_bytes: int = 2 * 1024**3
     spool_directory: Path | str | None = None
     spool_buffer_count: int = 3
+    trigger_roi: DisplayRoi2D | None = None
+    trigger_policy: Literal["edge", "level"] = "edge"
+    spool_chunk_frames: int | None = None
+    max_spool_bytes: int = 64 * 1024**3
 
     def __post_init__(self) -> None:
         for name in (
@@ -49,6 +70,7 @@ class ApolloSettings:
             "zero_byte_read_retries",
             "max_buffer_bytes",
             "spool_buffer_count",
+            "max_spool_bytes",
         ):
             require_integer(name, getattr(self, name))
         for name in ("frame_period_ms", "exposure_time_ms", "zero_byte_retry_delay_ms"):
@@ -57,8 +79,18 @@ class ApolloSettings:
             require_integer("read_timeout_ms", self.read_timeout_ms)
         if self.spool_buffer_count < 1:
             raise ValueError("spool_buffer_count must be >= 1")
-        if not 20 <= self.max_number_frames <= 2000:
-            raise ValueError("max_number_frames must be between 20 and 2000")
+        if self.spool_chunk_frames is not None:
+            require_integer("spool_chunk_frames", self.spool_chunk_frames)
+            if self.spool_chunk_frames < 1 or self.spool_directory is None:
+                raise ValueError("chunked storage requires spool_directory and spool_chunk_frames >= 1")
+            if self.max_number_frames < 1:
+                raise ValueError("max_number_frames must be >= 1")
+        elif not 20 <= self.max_number_frames <= 2000:
+            raise ValueError("max_number_frames must be between 20 and 2000 without chunked storage")
+        if self.max_spool_bytes < 1:
+            raise ValueError("max_spool_bytes must be >= 1")
+        if self.trigger_policy not in {"edge", "level"}:
+            raise ValueError("trigger_policy must be edge or level")
         if not 0 <= self.pre_trigger < self.max_number_frames:
             raise ValueError("pre_trigger must be >= 0 and smaller than max_number_frames")
         if self.trigger_position_px < 0:
@@ -112,6 +144,7 @@ class ApolloVideoSettings:
     trim_end: int | None = None
     crop_bottom: int = 0
     separator_frames: int = 0
+    legacy_layout: bool = False
 
     def __post_init__(self) -> None:
         require_finite("playback_fps", self.playback_fps)
@@ -160,7 +193,7 @@ class ApolloSequenceEvaluator(Protocol):
 
 
 class ApolloLifecycleError(RuntimeError):
-    """Raised when an Apollo worker cannot be stopped cleanly."""
+    """Raised when an Dropwatch Apollo worker cannot be stopped cleanly."""
 
 
 class ApolloFrameLossError(RuntimeError):
@@ -189,6 +222,7 @@ class ApolloStats:
 
     frames_received: int = 0
     sequences_captured: int = 0
+    triggers_detected: int = 0
     frame_gaps: int = 0
     daq_reads: int = 0
     zero_byte_reads: int = 0

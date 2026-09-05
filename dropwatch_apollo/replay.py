@@ -9,13 +9,13 @@ from pathlib import Path
 
 import numpy as np
 
-from dropwatch._hardware import LEFT_VIEW_WIDTH
-from dropwatch._hardware import RAW_FRAME_HEIGHT
-from dropwatch._hardware import RAW_FRAME_WIDTH
-from dropwatch._hardware import RLEDecoder
-from dropwatch.models import ApolloFrameLossError
-from dropwatch.models import require_finite
-from dropwatch.models import require_integer
+from dropwatch_apollo._hardware import LEFT_VIEW_WIDTH
+from dropwatch_apollo._hardware import RAW_FRAME_HEIGHT
+from dropwatch_apollo._hardware import RAW_FRAME_WIDTH
+from dropwatch_apollo._hardware import RLEDecoder
+from dropwatch_apollo.models import ApolloFrameLossError
+from dropwatch_apollo.models import require_finite
+from dropwatch_apollo.models import require_integer
 
 
 def _rle_frames(data: bytes) -> Iterator[np.ndarray]:

@@ -12,8 +12,8 @@ from uuid import uuid4
 
 import numpy as np
 
-from dropwatch._capture import _CapturedSequence
-from dropwatch.models import ApolloLifecycleError
+from dropwatch_apollo._capture import _CapturedSequence
+from dropwatch_apollo.models import ApolloLifecycleError
 
 
 def save_npy(sequence: np.ndarray, path: str | Path) -> Path:

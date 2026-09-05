@@ -9,11 +9,11 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from dropwatch import ApolloFrameLossError
-from dropwatch import ApolloIncompleteSequenceError
-from dropwatch import ApolloLifecycleError
-from dropwatch import ApolloSettings
-from dropwatch import DropwatchApollo
+from dropwatch_apollo import ApolloFrameLossError
+from dropwatch_apollo import ApolloIncompleteSequenceError
+from dropwatch_apollo import ApolloLifecycleError
+from dropwatch_apollo import ApolloSettings
+from dropwatch_apollo import DropwatchApollo
 
 from ._support import FakeFrameSource
 from ._support import FakeVideoWriter
@@ -73,7 +73,7 @@ def test_settings_validate_public_frame_contract():
 
 
 def test_save_avi_writes_binary_frames_and_releases_writer(monkeypatch, tmp_path):
-    monkeypatch.setattr("dropwatch._video._verify_video", lambda *_args: None)
+    monkeypatch.setattr("dropwatch_apollo._video._verify_video", lambda *_args: None)
     writer = FakeVideoWriter()
     writer_args: list[object] = []
 

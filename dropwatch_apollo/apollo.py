@@ -6,6 +6,7 @@ import logging
 import queue
 import threading
 import time
+from collections.abc import Callable
 from collections.abc import Iterable
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -20,27 +21,29 @@ from typing import Literal
 import numpy as np
 from typing_extensions import Self
 
-from dropwatch._capture import _CapturedSequence
-from dropwatch._capture import _find_bottom_object_position
-from dropwatch._capture import _SequenceCapture
-from dropwatch._evaluation import _EvaluationRunner
-from dropwatch._source import _FastEyeApolloSource
-from dropwatch._storage import _SequenceSpool
-from dropwatch._storage import save_npy
-from dropwatch._video import save_png
-from dropwatch._video import save_sequence_videos as _save_sequence_videos
-from dropwatch._video import save_video as _save_video
-from dropwatch.models import ApolloEvaluationError
-from dropwatch.models import ApolloFrameLossError
-from dropwatch.models import ApolloFrameSource
-from dropwatch.models import ApolloIncompleteSequenceError
-from dropwatch.models import ApolloLifecycleError
-from dropwatch.models import ApolloSequenceEvaluator
-from dropwatch.models import ApolloSettings
-from dropwatch.models import ApolloStats
-from dropwatch.models import ApolloVideoSettings
-from dropwatch.models import require_finite
-from dropwatch.models import require_integer
+from dropwatch_apollo._capture import _CapturedSequence
+from dropwatch_apollo._capture import _find_bottom_object_position
+from dropwatch_apollo._capture import _SequenceCapture
+from dropwatch_apollo._chunked import _ChunkedCapture
+from dropwatch_apollo._chunked import _ChunkedSpool
+from dropwatch_apollo._evaluation import _EvaluationRunner
+from dropwatch_apollo._source import _FastEyeApolloSource
+from dropwatch_apollo._storage import _SequenceSpool
+from dropwatch_apollo._storage import save_npy
+from dropwatch_apollo._video import save_png
+from dropwatch_apollo._video import save_sequence_videos as _save_sequence_videos
+from dropwatch_apollo._video import save_video as _save_video
+from dropwatch_apollo.models import ApolloEvaluationError
+from dropwatch_apollo.models import ApolloFrameLossError
+from dropwatch_apollo.models import ApolloFrameSource
+from dropwatch_apollo.models import ApolloIncompleteSequenceError
+from dropwatch_apollo.models import ApolloLifecycleError
+from dropwatch_apollo.models import ApolloSequenceEvaluator
+from dropwatch_apollo.models import ApolloSettings
+from dropwatch_apollo.models import ApolloStats
+from dropwatch_apollo.models import ApolloVideoSettings
+from dropwatch_apollo.models import require_finite
+from dropwatch_apollo.models import require_integer
 
 logger = logging.getLogger(__name__)
 
@@ -66,11 +69,16 @@ class DropwatchApollo:
         *,
         frame_source: ApolloFrameSource | None = None,
         evaluator: ApolloSequenceEvaluator | None = None,
+        evaluation_finalizer: Callable[[Any], Any] | None = None,
     ) -> None:
         self._settings = settings
         self._source = frame_source if frame_source is not None else _FastEyeApolloSource(settings)
-        self._evaluation = _EvaluationRunner(evaluator)
-        self._spool = _SequenceSpool()
+        if evaluation_finalizer is not None and evaluator is None:
+            raise ValueError("evaluation_finalizer requires an evaluator")
+        self._evaluation = _EvaluationRunner(evaluator, evaluation_finalizer)
+        self._spool: _SequenceSpool | _ChunkedSpool = (
+            _ChunkedSpool(settings) if settings.spool_chunk_frames is not None else _SequenceSpool()
+        )
         self._spooling = False
         self._state = _ApolloState.CLOSED
         self._state_lock = threading.RLock()
@@ -82,10 +90,11 @@ class DropwatchApollo:
         self._worker: threading.Thread | None = None
         self._worker_error: Exception | None = None
         self._max_sequences = 1
-        self._capture = _SequenceCapture(settings)
+        self._capture = self._new_capture()
         self._results: queue.Queue[_CapturedSequence] = queue.Queue(maxsize=1)
         self._frames_received = 0
         self._sequences_captured = 0
+        self._triggers_detected = 0
         self._frame_gaps = 0
         self._incomplete_sequences = 0
         self._drain_not_before = 0.0
@@ -114,6 +123,7 @@ class DropwatchApollo:
             return ApolloStats(
                 frames_received=self._frames_received,
                 sequences_captured=self._sequences_captured,
+                triggers_detected=self._triggers_detected,
                 frame_gaps=self._frame_gaps,
                 daq_reads=int(getattr(source_stats, "daq_reads", 0)),
                 zero_byte_reads=int(getattr(source_stats, "zero_byte_reads", 0)),
@@ -133,7 +143,14 @@ class DropwatchApollo:
             self._source.open()
             self._state = _ApolloState.IDLE
 
-    def start(self, timeout_s: float = 5.0, *, max_sequences: int = 1, max_duration_s: float | None = None) -> None:
+    def start(
+        self,
+        timeout_s: float = 5.0,
+        *,
+        max_sequences: int = 1,
+        max_duration_s: float | None = None,
+        cancel_event: threading.Event | None = None,
+    ) -> None:
         """Start a bounded acquisition and return only when it is safe to dispense."""
         require_finite("timeout_s", timeout_s)
         require_integer("max_sequences", max_sequences)
@@ -150,7 +167,7 @@ class DropwatchApollo:
             if self._exporting or self._spool.is_alive:
                 raise ApolloLifecycleError("cannot start while export or raw recording storage is running")
             if self._state is _ApolloState.RUNNING:
-                raise ApolloLifecycleError("Apollo acquisition is already running")
+                raise ApolloLifecycleError("Dropwatch Apollo acquisition is already running")
             if self._state is _ApolloState.COMPLETED:
                 if not self._results.empty():
                     raise ApolloLifecycleError(
@@ -161,7 +178,7 @@ class DropwatchApollo:
                 self._state = _ApolloState.IDLE
             if self._state is _ApolloState.FAILED:
                 if self._worker is not None and self._worker.is_alive():
-                    raise ApolloLifecycleError("the failed Apollo acquisition is still stopping")
+                    raise ApolloLifecycleError("the failed Dropwatch Apollo acquisition is still stopping")
                 if self._evaluation.is_alive:
                     raise ApolloLifecycleError("evaluations from the failed acquisition are still stopping")
                 if not self._results.empty():
@@ -192,13 +209,14 @@ class DropwatchApollo:
                 with self._stats_lock:
                     self._frames_received = 0
                     self._sequences_captured = 0
+                    self._triggers_detected = 0
                     self._frame_gaps = 0
                     self._incomplete_sequences = 0
 
                 frame_shape = getattr(self._source, "frame_shape", None)
                 frame_dtype = getattr(self._source, "frame_dtype", None)
                 if frame_shape is None or frame_dtype is None:
-                    raise TypeError("Apollo frame sources must declare frame_shape and frame_dtype")
+                    raise TypeError("Dropwatch Apollo frame sources must declare frame_shape and frame_dtype")
                 additional_buffer_bytes = int(getattr(self._source, "reserved_buffer_bytes", 0))
                 self._capture.prepare(
                     frame_shape,
@@ -210,7 +228,7 @@ class DropwatchApollo:
                     self._spool.start(
                         self.settings.spool_directory,
                         self.settings.spool_buffer_count,
-                        max_sequences
+                        (1 if isinstance(self._spool, _ChunkedSpool) else max_sequences)
                         * self.settings.max_number_frames
                         * prod(frame_shape)
                         * np.dtype(frame_dtype).itemsize,
@@ -238,25 +256,28 @@ class DropwatchApollo:
                 try:
                     self._source.stop()
                 except Exception:
-                    logger.exception("failed to stop Apollo source after an incomplete start")
+                    logger.exception("failed to stop Dropwatch Apollo source after an incomplete start")
                 raise
 
         deadline = time.monotonic() + timeout_s
         while not self._armed_event.is_set():
+            if cancel_event is not None and cancel_event.is_set():
+                self.stop(drain=False)
+                raise ApolloLifecycleError("recording cancelled before readiness")
             if self._worker_done.is_set():
                 self.stop()
-                raise ApolloLifecycleError("Apollo acquisition stopped before it became armed")
+                raise ApolloLifecycleError("Dropwatch Apollo acquisition stopped before it became armed")
             remaining = deadline - time.monotonic()
             if remaining <= 0:
                 self.stop()
-                raise TimeoutError(f"Apollo did not become armed after {timeout_s}s")
+                raise TimeoutError(f"Dropwatch Apollo did not become armed after {timeout_s}s")
             self._armed_event.wait(min(self._RESULT_WAIT_INTERVAL_S, remaining))
         self._raise_worker_error()
 
     def set_trigger_size(self, width: int = 100, timeout_s: float = 5.0) -> int:
         """Place a trigger band directly above the object entering from below.
 
-        Apollo keeps the unrotated first camera view. Its physical bottom is
+        Dropwatch Apollo keeps the unrotated first camera view. Its physical bottom is
         therefore the trailing (right) image edge. The highest foreground
         connected to that edge sets the upper boundary of the plate.
 
@@ -271,7 +292,7 @@ class DropwatchApollo:
 
         with self._state_lock:
             if self._exporting or self._spool.is_alive or self._state is _ApolloState.RUNNING:
-                raise ApolloLifecycleError("cannot set trigger size while Apollo acquisition is running")
+                raise ApolloLifecycleError("cannot set trigger size while Dropwatch Apollo acquisition is running")
             if self._state is _ApolloState.COMPLETED:
                 if not self._results.empty():
                     raise ApolloLifecycleError(
@@ -299,12 +320,21 @@ class DropwatchApollo:
                 trigger_position_px=trigger_position_px,
                 trigger_from_top=False,
                 trigger_width_px=width,
+                trigger_roi=(
+                    replace(
+                        self.settings.trigger_roi,
+                        y0=snapshot.shape[1] - trigger_position_px - width,
+                        y1=snapshot.shape[1] - trigger_position_px,
+                    )
+                    if self.settings.trigger_roi is not None
+                    else None
+                ),
             )
-            self._capture = _SequenceCapture(self.settings)
+            self._capture = self._new_capture()
             return trigger_position_px
 
     def save_avi(self, sequence: np.ndarray, path: str | Path, fps: float = 25.0) -> Path:
-        """Save one unannotated sequence with the legacy Apollo AVI polarity."""
+        """Save one unannotated sequence with the legacy Dropwatch Apollo AVI polarity."""
         with self._exclusive_io():
             return _save_video(
                 sequence,
@@ -440,10 +470,10 @@ class DropwatchApollo:
 
             with self._state_lock:
                 if self._state is not _ApolloState.RUNNING:
-                    raise ApolloLifecycleError("Apollo acquisition is not running")
+                    raise ApolloLifecycleError("Dropwatch Apollo acquisition is not running")
             if self._worker_done.is_set():
                 self._raise_worker_error()
-                raise ApolloLifecycleError("Apollo acquisition stopped before a sequence was available")
+                raise ApolloLifecycleError("Dropwatch Apollo acquisition stopped before a sequence was available")
 
             remaining = None if deadline is None else deadline - time.monotonic()
             if remaining is not None and remaining <= 0:
@@ -469,7 +499,7 @@ class DropwatchApollo:
             self._raise_worker_error()
             with self._state_lock:
                 if self._state not in {_ApolloState.RUNNING, _ApolloState.COMPLETED}:
-                    raise ApolloLifecycleError("Apollo acquisition is not running")
+                    raise ApolloLifecycleError("Dropwatch Apollo acquisition is not running")
             remaining = None if deadline is None else deadline - time.monotonic()
             if remaining is not None and remaining <= 0:
                 raise TimeoutError(
@@ -488,6 +518,14 @@ class DropwatchApollo:
         self._evaluation.wait(self._worker_done, timeout_s)
         self._raise_worker_error()
         return self._evaluation.collect()
+
+    def request_stop(self, *, drain: bool = True) -> None:
+        """Nonblocking stop request; call stop() to join and collect results."""
+        with self._state_lock:
+            if drain:
+                self._request_drain()
+            else:
+                self._stop_event.set()
 
     def stop(self, *, drain: bool = True, timeout_s: float | None = None) -> list[np.ndarray]:
         """Drain queued/partially flushed batches, then finish any active window.
@@ -526,7 +564,9 @@ class DropwatchApollo:
                     self._stop_event.set()
                     worker.join(timeout=self._STOP_TIMEOUT_S)
                 if worker.is_alive():
-                    raise ApolloLifecycleError(f"Apollo acquisition worker did not stop within {self._STOP_TIMEOUT_S}s")
+                    raise ApolloLifecycleError(
+                        f"Dropwatch Apollo acquisition worker did not stop within {self._STOP_TIMEOUT_S}s"
+                    )
 
         with self._state_lock:
             self._worker = None
@@ -558,7 +598,9 @@ class DropwatchApollo:
             if self._worker is not None and self._worker.is_alive():
                 if stop_error is not None:
                     raise stop_error
-                raise ApolloLifecycleError("cannot close Apollo while its acquisition worker is still running")
+                raise ApolloLifecycleError(
+                    "cannot close Dropwatch Apollo while its acquisition worker is still running"
+                )
         if self._spool.is_alive:
             try:
                 self._spool.finish(timeout_s=self._STOP_TIMEOUT_S)
@@ -600,7 +642,7 @@ class DropwatchApollo:
             try:
                 self.close()
             except Exception:
-                logger.exception("failed to close Apollo while handling another exception")
+                logger.exception("failed to close Dropwatch Apollo while handling another exception")
             return False
         self.close()
         return False
@@ -626,7 +668,7 @@ class DropwatchApollo:
                     self._stop_event.wait(self._POLL_INTERVAL_S)
                     continue
                 if batch.ndim != 3:
-                    raise ValueError(f"Apollo frame source returned invalid batch shape {batch.shape}")
+                    raise ValueError(f"Dropwatch Apollo frame source returned invalid batch shape {batch.shape}")
                 with self._stats_lock:
                     self._frames_received += len(batch)
 
@@ -634,12 +676,18 @@ class DropwatchApollo:
                     if self._stop_event.is_set():
                         break
                     sequence = self._capture.push(frame)
+                    with self._stats_lock:
+                        self._triggers_detected = self._capture.trigger_count
                     if self._capture.is_armed and not self._armed_event.is_set():
                         self._armed_event.set()
                     if sequence is not None:
-                        if self._spooling:
+                        if isinstance(self._capture, _ChunkedCapture):
+                            pass  # Chunks are already queued; the writer publishes the completed file.
+                        elif self._spooling:
+                            assert isinstance(self._spool, _SequenceSpool) and isinstance(sequence, _CapturedSequence)
                             self._spool.submit(sequence)
                         else:
+                            assert isinstance(sequence, _CapturedSequence)
                             self._publish_sequence(sequence)
                         with self._stats_lock:
                             self._sequences_captured += 1
@@ -660,7 +708,7 @@ class DropwatchApollo:
                     if self._worker_error is None:
                         self._worker_error = exc
                     else:
-                        logger.exception("failed to stop Apollo frame source")
+                        logger.exception("failed to stop Dropwatch Apollo frame source")
             if self._spooling:
                 try:
                     self._spool.finish()
@@ -671,6 +719,8 @@ class DropwatchApollo:
             if self._capture.is_capturing:
                 with self._stats_lock:
                     self._incomplete_sequences += 1
+            with self._stats_lock:
+                self._triggers_detected = self._capture.trigger_count
             self._capture.reset()
             with self._state_lock:
                 if self._state is _ApolloState.RUNNING:
@@ -685,10 +735,10 @@ class DropwatchApollo:
                 batch = self._source.read()
                 if batch is not None and len(batch) > 0:
                     if batch.ndim != 3:
-                        raise ValueError(f"Apollo frame source returned invalid batch shape {batch.shape}")
+                        raise ValueError(f"Dropwatch Apollo frame source returned invalid batch shape {batch.shape}")
                     return batch[-1].copy()
                 if time.monotonic() >= deadline:
-                    raise TimeoutError(f"no Apollo snapshot available after {timeout_s}s")
+                    raise TimeoutError(f"no Dropwatch Apollo snapshot available after {timeout_s}s")
                 time.sleep(self._POLL_INTERVAL_S)
         finally:
             self._source.stop()
@@ -721,6 +771,11 @@ class DropwatchApollo:
         self._results.put_nowait(sequence)
         self._evaluation.submit(sequence)
 
+    def _new_capture(self) -> _SequenceCapture | _ChunkedCapture:
+        if isinstance(self._spool, _ChunkedSpool):
+            return _ChunkedCapture(self.settings, self._spool.submit)
+        return _SequenceCapture(self.settings)
+
     def _request_drain(self) -> None:
         if not self._drain_event.is_set():
             # A partial FPGA RLE batch may not yet be USB-readable. Allow one
@@ -739,7 +794,7 @@ class DropwatchApollo:
                 or self._state is _ApolloState.RUNNING
                 or (self._worker is not None and self._worker.is_alive())
             ):
-                raise ApolloLifecycleError("stop Apollo acquisition before exporting video")
+                raise ApolloLifecycleError("stop Dropwatch Apollo acquisition before exporting video")
             self._exporting = True
         try:
             yield
@@ -753,7 +808,7 @@ class DropwatchApollo:
                 self._capture.is_done or self.stats.sequences_captured >= self._max_sequences
             ) and not self._worker_done.wait(self._STOP_TIMEOUT_S):
                 raise ApolloLifecycleError(
-                    f"Apollo acquisition did not finalize within {self._STOP_TIMEOUT_S}s after its last sequence"
+                    f"Dropwatch Apollo acquisition did not finalize within {self._STOP_TIMEOUT_S}s after its last sequence"
                 )
             self._raise_worker_error()
         except Exception as error:
