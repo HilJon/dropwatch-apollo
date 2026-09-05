@@ -274,8 +274,9 @@ def run_diagnostics(
                     (settings.rle_batch_frames, RAW_FRAME_HEIGHT, RAW_FRAME_WIDTH), 255, dtype=np.uint8
                 )
             report["phase"] = "start"
-            camera.set_enc_mode()
+            # Flush resets RLE acquisition, so it must precede enabling it.
             camera.flush()
+            camera.set_enc_mode()
             camera.trig_frame()
             _acquire(camera, decoder, destination, report, events, duration_s, idle_timeout_s, extended_status)
             report.update(outcome="passed", phase="complete")

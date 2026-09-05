@@ -127,8 +127,9 @@ class _FastEyeApolloSource:
             else:
                 self._decode_buffer.fill(255)
             self._previous_frame_counter = None
-            camera.set_enc_mode()
+            # Flush resets RLE acquisition, so it must precede enabling it.
             camera.flush()
+            camera.set_enc_mode()
             camera.trig_frame()
             self._started = True
         except Exception:

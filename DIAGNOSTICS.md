@@ -6,8 +6,10 @@ fault. It changes the usual acquisition settings, not the camera firmware.
 
 ## Run on the Windows acquisition PC
 
-Install the updated package (version 0.2.1 or later); the older wheel does not
-contain this command. From this source folder: `python -m pip install .`.
+Install version **0.2.2 or later**. Version 0.2.1 introduced this command but has
+a startup-order bug that can prevent any image transfer. From the updated source
+folder: `python -m pip install --upgrade .`. Verify the installed version with
+`python -c "import dropwatch; print(dropwatch.__version__)"`.
 Close other programs holding the camera, including another Dropwatch process.
 Use the normal illumination, threshold and exposure. Keep the plate in view.
 
@@ -78,6 +80,23 @@ test discards images and stops at its deadline without draining the final batch;
 it is not a substitute for recorder/stop qualification in `HARDWARE_ACCEPTANCE.md`.
 
 ## Controlled follow-up tests
+
+### Timeout before the first image read
+
+If `read_attempts` and `bytes_received` are both zero, a status/idle timeout is
+**not** a zero-byte read: the diagnostic never called the image-read function.
+In version 0.2.1, startup used `enable RLE -> flush -> trigger`. The vendor flush
+command disables RLE and clears the FPGA buffers; triggering alone does not
+re-enable it. Version 0.2.2 uses `flush -> enable RLE -> trigger` in both the
+recorder and diagnostics, preserving startup cleanup without disabling capture.
+
+After upgrading, repeat the two transport commands above at 1,000 and 2,000 fps.
+Only proceed to decode/recording qualification once image transfers occur and
+the transport runs pass. Increasing read retries or the read timeout does not
+address a run with zero read attempts. `numImgAvail = 1` alone is not proof that
+a buffer is ready: the trigger also updates this host-side counter.
+
+### Failures during transfers
 
 Change only one factor per comparison. For example, repeat a failing run with
 the same frame rate and a different timeout:

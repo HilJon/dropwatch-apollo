@@ -101,6 +101,26 @@ def run(tmp_path, **kwargs):
     return json.loads(path.read_text()), code
 
 
+@pytest.mark.parametrize("mode", ["transport", "decode"])
+@pytest.mark.parametrize("frame_period_ms", [1.0, 0.5])
+def test_diagnostics_flushes_before_enabling_rle(tmp_path, rig, mode, frame_period_ms):
+    camera, _decoder, _clock = rig
+    path, code = diagnostics.run_diagnostics(
+        tmp_path,
+        ApolloSettings(max_number_frames=20, frame_period_ms=frame_period_ms),
+        mode=mode,
+        duration_s=0.05,
+    )
+    report = json.loads(path.read_text())
+    assert code == 0
+    assert report["summary"]["successful_reads"] > 0
+    assert report["summary"]["empty_polls"] == 0
+    assert camera.sync_commands == ["flush", "rle", "frame", "flush"]
+    assert report["camera_closed"] is True
+    assert not camera.stream_running
+    assert camera.payload is None
+
+
 def test_transport_is_bounded_does_not_decode_or_write_during_reads(tmp_path, rig, monkeypatch):
     camera, decoder, _clock = rig
 
@@ -317,6 +337,27 @@ def test_start_failure_closes_camera_and_creates_report(tmp_path, rig, phase):
     assert code == 1
     assert report["error"]["message"] == f"failed {phase}"
     assert camera.close_count == 1
+
+
+def test_start_flush_failure_never_enables_or_triggers(tmp_path, rig, monkeypatch):
+    camera = rig[0]
+    original_flush = camera.flush
+
+    def fail_first_flush():
+        original_flush()
+        if camera.flush_count == 1:
+            raise DAQError("startup flush failed")
+
+    monkeypatch.setattr(camera, "flush", fail_first_flush)
+    report, code = run(tmp_path)
+    assert code == 1
+    assert report["error"] == {"phase": "start", "type": "DAQError", "message": "startup flush failed"}
+    assert camera.sync_commands == ["flush", "flush"]  # Failure cleanup only.
+    assert report["summary"]["read_attempts"] == 0
+    assert report["camera_closed"] is True
+    assert report["cleanup_errors"] == []
+    assert camera.close_count == 1
+    assert camera.payload is None
 
 
 def test_dll_load_failure_is_reported_without_camera(tmp_path, rig, monkeypatch):

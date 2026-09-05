@@ -53,3 +53,4 @@ recordings. A connected camera is required for `HARDWARE_ACCEPTANCE.md`.
 
 For isolated camera/USB diagnostics, run `dwa diagnose --help` and follow
 [DIAGNOSTICS.md](DIAGNOSTICS.md). This command is available from version 0.2.1.
+Use **0.2.2 or later** for hardware testing; it fixes the RLE startup command order.

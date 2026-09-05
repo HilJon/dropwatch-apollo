@@ -1,6 +1,6 @@
 [project]
 name = "dropwatch-apollo"
-version = "0.2.1"
+version = "0.2.2"
 description = "Minimal single-view FastEye RLE drop recorder"
 authors = [
   { name = "Adrian Rohner", email = "arohner@hamilton.ch" },

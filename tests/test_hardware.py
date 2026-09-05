@@ -22,6 +22,9 @@ from dropwatch._source import _FastEyeApolloSource
 class FakeFastEye:
     def __init__(self) -> None:
         self.serial_nr = 123
+        self.rle_enabled = False
+        self.stream_running = False
+        self.sync_commands: list[str] = []
         self.num_stored_images = 1
         self.frame_period = None
         self.exposure_time = None
@@ -36,6 +39,14 @@ class FakeFastEye:
         self.read_timeout_ms = None
         self.read_results: list[Exception | None] = []
         self.read_count = 0
+
+    @property
+    def num_stored_images(self) -> int:
+        return self._num_stored_images if self.stream_running else 0
+
+    @num_stored_images.setter
+    def num_stored_images(self, value: int) -> None:
+        self._num_stored_images = value
 
     def open(self) -> None:
         self.open_count += 1
@@ -59,10 +70,12 @@ class FakeFastEye:
         self.num_img_flush = rle_batch_frames
 
     def set_enc_mode(self) -> None:
-        pass
+        self.sync_commands.append("rle")
+        self.rle_enabled = True
 
     def trig_frame(self) -> None:
-        pass
+        self.sync_commands.append("frame")
+        self.stream_running = self.rle_enabled
 
     def get_enc_error(self) -> bool:
         return False
@@ -79,9 +92,15 @@ class FakeFastEye:
 
     def flush(self) -> None:
         self.flush_count += 1
+        self.sync_commands.append("flush")
+        # Vendor flush resets RLE acquisition; it is not just a host-buffer clear.
+        self.rle_enabled = False
+        self.stream_running = False
 
     def close(self) -> None:
         self.close_count += 1
+        self.rle_enabled = False
+        self.stream_running = False
 
 
 class FakeDecoder:
@@ -136,6 +155,33 @@ def rle_stream(counters: list[int]) -> bytearray:
         data.extend(header)
     data.extend(bytearray(40))
     return data
+
+
+@pytest.mark.parametrize("frame_period_ms", [1.0, 0.5])
+def test_fasteye_start_flushes_before_enabling_rle_on_every_acquisition(monkeypatch, frame_period_ms):
+    camera = FakeFastEye()
+    monkeypatch.setattr(FakeDecoder, "return_code", 1)
+    monkeypatch.setattr(FakeDecoder, "generated_bytes_override", None)
+    monkeypatch.setattr(FakeDecoder, "consumed_bytes_override", None)
+    monkeypatch.setattr("dropwatch._hardware.FastEyeRLE", lambda: camera)
+    monkeypatch.setattr("dropwatch._hardware.RLEDecoder", FakeDecoder)
+    source = _FastEyeApolloSource(ApolloSettings(max_number_frames=20, frame_period_ms=frame_period_ms))
+
+    try:
+        for cycle in range(3):
+            source.start()
+            source.start()  # Already started: no extra flush or trigger.
+            assert source.read() is not None
+            assert camera.sync_commands == ["flush", "rle", "frame", "flush"] * cycle + ["flush", "rle", "frame"]
+            source.stop()
+            assert not camera.stream_running
+            assert not source._started
+        assert camera.open_count == 1
+        assert camera.read_count == 3
+    finally:
+        source.close()
+    assert camera.close_count == 1
+    assert source._camera is source._decoder is source._decode_buffer is None
 
 
 def test_fasteye_adapter_returns_one_view_and_reuses_decode_buffer(
@@ -315,6 +361,32 @@ def test_fasteye_adapter_flushes_after_incomplete_start(monkeypatch):
 
     assert fake_camera.flush_count == 1
     assert fake_camera.close_count == 1
+
+
+def test_fasteye_start_flush_failure_never_enables_or_triggers(monkeypatch):
+    camera = FakeFastEye()
+    original_flush = camera.flush
+
+    def fail_first_flush():
+        original_flush()
+        if camera.flush_count == 1:
+            raise DAQError("startup flush failed")
+
+    monkeypatch.setattr(camera, "flush", fail_first_flush)
+    monkeypatch.setattr("dropwatch._hardware.FastEyeRLE", lambda: camera)
+    monkeypatch.setattr("dropwatch._hardware.RLEDecoder", FakeDecoder)
+    source = _FastEyeApolloSource(ApolloSettings(max_number_frames=20))
+    try:
+        with pytest.raises(DAQError, match="startup flush failed"):
+            source.start()
+        assert camera.sync_commands == ["flush", "flush"]  # Failure cleanup only.
+        assert camera.read_count == 0
+        assert camera.close_count == 1
+        assert source._camera is None
+        assert not source._started
+    finally:
+        source.close()
+    assert source._decoder is source._decode_buffer is None
 
 
 def test_fasteye_adapter_rejects_frame_counter_gap(monkeypatch):

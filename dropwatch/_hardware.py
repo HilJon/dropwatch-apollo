@@ -194,6 +194,7 @@ class FastEyeRLE:
         self._daq.set("sync", "frame")
 
     def flush(self) -> None:
+        """Stop/reset RLE acquisition and clear FPGA buffers; re-enable before triggering."""
         self._daq.set("sync", "flush")
 
     def get_enc_error(self) -> bool:
